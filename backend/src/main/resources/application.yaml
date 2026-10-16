@@ -1,0 +1,18 @@
+spring:
+  application:
+    name: curral-inteligente
+  datasource:
+    url: jdbc:postgresql://localhost:5432/fazenda
+    username: root
+    password: root
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+
+mqtt:
+  # broker externo (público, só para teste)
+  broker-url: tcp://broker.hivemq.com:1883
+  topic-prefix: a3-usjt-fazenda-inteligente/curral
+  client-id-prefix: fazenda-inteligente-backend

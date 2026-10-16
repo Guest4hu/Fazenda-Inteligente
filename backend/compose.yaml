@@ -1,0 +1,30 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: fazendaDb-postgres
+    environment:
+      POSTGRES_DB: fazenda
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U curral -d curral"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+# Por enquanto usando um Broker publico então não precisa inicializar o moqsquitto
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: fazenda-inteligente-mosquitto
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - mosquitto-data:/mosquitto/data
+
+volumes:
+  postgres-data:
+  mosquitto-data:
