@@ -1,0 +1,46 @@
+package com.usjt.a3.model.entity;
+
+import com.usjt.a3.model.enums.AnimalEventType;
+import com.usjt.a3.model.enums.EventOrigin;
+import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "animal_event")
+@Getter
+@Setter
+@NoArgsConstructor
+public class AnimalEvent {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "corral_id", nullable = false)
+    private Corral corral;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "animal_id", nullable = false)
+    private Animal animal;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type_event", nullable = false)
+    private AnimalEventType typeEvent;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "origin" , nullable = false)
+    private EventOrigin eventOrigin;
+
+    @Column(updatable = false, nullable = false)
+    private LocalDateTime instant;
+
+    @PrePersist
+    public void prePersist() {
+        instant = LocalDateTime.now();
+    }
+}
