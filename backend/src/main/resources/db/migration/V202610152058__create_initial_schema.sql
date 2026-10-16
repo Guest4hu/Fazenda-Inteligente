@@ -4,119 +4,119 @@
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
--- 1. CADASTROS E ESTADO ATUAL (USERS -> FAZENDAS -> CURRAIS -> ANIMAIS)
+-- 1. CADASTROS E ESTADO ATUAL (USERS -> FARMS -> CORRALS -> ANIMALS)
 -- ----------------------------------------------------------------------------
 
 CREATE TABLE users (
                        id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-                       nome VARCHAR(100) NOT NULL,
+                       name VARCHAR(100) NOT NULL,
                        email VARCHAR(150) NOT NULL UNIQUE,
-                       senha_hash VARCHAR(255) NOT NULL,
-                       criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                       password_hash VARCHAR(255) NOT NULL,
+                       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE fazendas (
-                          id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-                          usuario_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                          nome VARCHAR(100) NOT NULL,
-                          criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+CREATE TABLE farms (
+                       id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                       user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                       name VARCHAR(100) NOT NULL,
+                       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_fazendas_usuario_id ON fazendas(usuario_id);
+CREATE INDEX idx_farms_user_id ON farms(user_id);
 
-CREATE TABLE currais (
+CREATE TABLE corral (
+                        id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                        farm_id BIGINT NOT NULL REFERENCES farms(id) ON DELETE CASCADE,
+                        name VARCHAR(100) NOT NULL,
+                        mac_address VARCHAR(12) NOT NULL UNIQUE,
+                        clean_time TIME NULL,
+                        limit_odor INTEGER NOT NULL DEFAULT 400,
+                        pump_duration_seconds INTEGER NOT NULL DEFAULT 30,
+                        CONSTRAINT chk_corral_mac_address CHECK (mac_address ~ '^[0-9A-F]{12}$'),
+                        CONSTRAINT chk_corral_pump_duration CHECK (pump_duration_seconds > 0)
+);
+
+CREATE INDEX idx_corral_farm_id ON corral(farm_id);
+
+CREATE TABLE animals (
                          id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-                         fazenda_id BIGINT NOT NULL REFERENCES fazendas(id) ON DELETE CASCADE,
-                         nome VARCHAR(100) NOT NULL,
-                         mac_address VARCHAR(12) NOT NULL UNIQUE,
-                         horario_limpeza TIME NULL,
-                         limiar_odor INTEGER NOT NULL DEFAULT 400,
-                         duracao_bomba_segundos INTEGER NOT NULL DEFAULT 30,
-                         CONSTRAINT chk_currais_mac_address CHECK (mac_address ~ '^[0-9A-F]{12}$'),
-    CONSTRAINT chk_currais_duracao_bomba CHECK (duracao_bomba_segundos > 0)
-);
-
-CREATE INDEX idx_currais_fazenda_id ON currais(fazenda_id);
-
-CREATE TABLE animais (
-                         id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-                         fazenda_id BIGINT NOT NULL REFERENCES fazendas(id) ON DELETE CASCADE,
-                         nome VARCHAR(50) NOT NULL,
-                         identificacao VARCHAR(30) NULL,
+                         farm_id BIGINT NOT NULL REFERENCES farms(id) ON DELETE CASCADE,
+                         name VARCHAR(50) NOT NULL,
+                         identification VARCHAR(30) NULL,
                          tag_uid VARCHAR(32) NOT NULL UNIQUE,
-                         curral_atual_id BIGINT NULL REFERENCES currais(id) ON DELETE SET NULL
+                         current_corral_id BIGINT NULL REFERENCES corral(id) ON DELETE SET NULL
 );
 
-CREATE INDEX idx_animais_fazenda_id ON animais(fazenda_id);
-CREATE INDEX idx_animais_curral_atual ON animais(curral_atual_id);
+CREATE INDEX idx_animals_farm_id ON animals(farm_id);
+CREATE INDEX idx_animals_current_corral ON animals(current_corral_id);
 
 -- ----------------------------------------------------------------------------
 -- 2. OPERAÇÕES, TELEMETRIA E CICLO DE VIDA (IoT)
 -- ----------------------------------------------------------------------------
 
-CREATE TABLE eventos_presenca (
-                                  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-                                  curral_id BIGINT NOT NULL REFERENCES currais(id) ON DELETE CASCADE,
-                                  animal_id BIGINT NOT NULL REFERENCES animais(id) ON DELETE CASCADE,
-                                  tipo_evento VARCHAR(10) NOT NULL,
-                                  origem VARCHAR(10) NOT NULL DEFAULT 'TAG',
-                                  instante TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                                  CONSTRAINT chk_eventos_presenca_tipo CHECK (tipo_evento IN ('ENTROU', 'SAIU')),
-                                  CONSTRAINT chk_eventos_presenca_origem CHECK (origem IN ('TAG', 'MANUAL'))
+CREATE TABLE animal_event (
+                              id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                              corral_id BIGINT NOT NULL REFERENCES corral(id) ON DELETE CASCADE,
+                              animal_id BIGINT NOT NULL REFERENCES animals(id) ON DELETE CASCADE,
+                              type_event VARCHAR(10) NOT NULL,
+                              origin VARCHAR(10) NOT NULL DEFAULT 'TAG',
+                              instant TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                              CONSTRAINT chk_animal_event_type CHECK (type_event IN ('ENTROU', 'SAIU')),
+                              CONSTRAINT chk_animal_event_origin CHECK (origin IN ('TAG', 'MANUAL'))
 );
 
-CREATE INDEX idx_eventos_presenca_curral ON eventos_presenca(curral_id, instante DESC);
-CREATE INDEX idx_eventos_presenca_animal ON eventos_presenca(animal_id, instante DESC);
+CREATE INDEX idx_animal_event_corral ON animal_event(corral_id, instant DESC);
+CREATE INDEX idx_animal_event_animal ON animal_event(animal_id, instant DESC);
 
-CREATE TABLE leituras_odor (
-                               id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-                               curral_id BIGINT NOT NULL REFERENCES currais(id) ON DELETE CASCADE,
-                               valor INTEGER NOT NULL,
-                               instante TIMESTAMPTZ NOT NULL DEFAULT NOW()
+CREATE TABLE odor_telemetry (
+                                id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                                corral_id BIGINT NOT NULL REFERENCES corral(id) ON DELETE CASCADE,
+                                value INTEGER NOT NULL,
+                                instant TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_leituras_odor_curral_instante ON leituras_odor(curral_id, instante DESC);
+CREATE INDEX idx_odor_telemetry_corral_instant ON odor_telemetry(corral_id, instant DESC);
 
-CREATE TABLE comandos_limpeza (
-                                  id UUID PRIMARY KEY,
-                                  curral_id BIGINT NOT NULL REFERENCES currais(id) ON DELETE CASCADE,
-                                  origem VARCHAR(20) NOT NULL,
-                                  estado VARCHAR(25) NOT NULL,
-                                  duracao_segundos INTEGER NOT NULL,
-                                  criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                                  enviado_em TIMESTAMPTZ NULL,
-                                  confirmado_em TIMESTAMPTZ NULL,
-                                  CONSTRAINT chk_comandos_limpeza_origem CHECK (origem IN ('AUTOMATICA', 'MANUAL', 'EVENTO')),
-                                  CONSTRAINT chk_comandos_limpeza_estado CHECK (estado IN (
-                                                                                           'AGUARDANDO_CONFIRMACAO',
-                                                                                           'PENDENTE_ENVIO',
-                                                                                           'ENVIADO',
-                                                                                           'CONFIRMADO',
-                                                                                           'TIMEOUT',
-                                                                                           'CANCELADO'
-                                      )),
-                                  CONSTRAINT chk_comandos_limpeza_duracao CHECK (duracao_segundos > 0)
+CREATE TABLE clean_cmd (
+                           id UUID PRIMARY KEY,
+                           corral_id BIGINT NOT NULL REFERENCES corral(id) ON DELETE CASCADE,
+                           origin VARCHAR(20) NOT NULL,
+                           state VARCHAR(25) NOT NULL,
+                           seconds_duration INTEGER NOT NULL,
+                           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                           sent_at TIMESTAMPTZ NULL,
+                           confirmed_at TIMESTAMPTZ NULL,
+                           CONSTRAINT chk_clean_cmd_origin CHECK (origin IN ('AUTOMATICA', 'MANUAL', 'EVENTO')),
+                           CONSTRAINT chk_clean_cmd_state CHECK (state IN (
+                                                                           'AGUARDANDO_CONFIRMACAO',
+                                                                           'PENDENTE_ENVIO',
+                                                                           'ENVIADO',
+                                                                           'CONFIRMADO',
+                                                                           'TIMEOUT',
+                                                                           'CANCELADO'
+                               )),
+                           CONSTRAINT chk_clean_cmd_duration CHECK (seconds_duration > 0)
 );
 
-CREATE INDEX idx_comandos_limpeza_curral_estado ON comandos_limpeza(curral_id, estado);
+CREATE INDEX idx_clean_cmd_corral_state ON clean_cmd(corral_id, state);
 
 -- Garante que não existe mais do que um comando ativo em simultâneo no mesmo curral
-CREATE UNIQUE INDEX uq_comandos_limpeza_ativo_por_curral
-    ON comandos_limpeza(curral_id)
-    WHERE estado IN ('AGUARDANDO_CONFIRMACAO', 'PENDENTE_ENVIO', 'ENVIADO');
+CREATE UNIQUE INDEX uq_clean_cmd_active_per_corral
+    ON clean_cmd(corral_id)
+    WHERE state IN ('AGUARDANDO_CONFIRMACAO', 'PENDENTE_ENVIO', 'ENVIADO');
 
-CREATE TABLE pendencias_identificacao (
-                                          id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-                                          curral_id BIGINT NOT NULL REFERENCES currais(id) ON DELETE CASCADE,
-                                          tag_uid VARCHAR(32) NULL,
-                                          tipo_evento VARCHAR(10) NOT NULL DEFAULT 'SAIU',
-                                          instante TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                                          resolvida BOOLEAN NOT NULL DEFAULT FALSE,
-                                          animal_id_resolvido BIGINT NULL REFERENCES animais(id) ON DELETE SET NULL,
-                                          resolvido_em TIMESTAMPTZ NULL,
-                                          CONSTRAINT chk_pendencias_tipo_evento CHECK (tipo_evento IN ('ENTROU', 'SAIU'))
+CREATE TABLE identify_pendency (
+                                   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                                   corral_id BIGINT NOT NULL REFERENCES corral(id) ON DELETE CASCADE,
+                                   tag_uid VARCHAR(32) NULL,
+                                   type_event VARCHAR(10) NOT NULL DEFAULT 'SAIU',
+                                   instant TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                                   resolved BOOLEAN NOT NULL DEFAULT FALSE,
+                                   animal_id_resolved BIGINT NULL REFERENCES animals(id) ON DELETE SET NULL,
+                                   resolved_at TIMESTAMPTZ NULL,
+                                   CONSTRAINT chk_identify_pendency_type_event CHECK (type_event IN ('ENTROU', 'SAIU'))
 );
 
-CREATE INDEX idx_pendencias_abertas_curral
-    ON pendencias_identificacao(curral_id, instante DESC)
-    WHERE resolvida = FALSE;
+CREATE INDEX idx_identify_pendency_open_corral
+    ON identify_pendency(corral_id, instant DESC)
+    WHERE resolved = FALSE;
