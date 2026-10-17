@@ -88,11 +88,9 @@ CREATE TABLE clean_cmd (
                            confirmed_at TIMESTAMPTZ NULL,
                            CONSTRAINT chk_clean_cmd_origin CHECK (origin IN ('AUTOMATICA', 'MANUAL', 'EVENTO')),
                            CONSTRAINT chk_clean_cmd_state CHECK (state IN (
-                                                                           'AGUARDANDO_CONFIRMACAO',
-                                                                           'PENDENTE_ENVIO',
-                                                                           'ENVIADO',
-                                                                           'CONFIRMADO',
-                                                                           'TIMEOUT',
+                                                                           'PENDENTE',
+                                                                           'EM_ANDAMENTO',
+                                                                           'CONCLUIDO',
                                                                            'CANCELADO'
                                )),
                            CONSTRAINT chk_clean_cmd_duration CHECK (seconds_duration > 0)
@@ -103,7 +101,7 @@ CREATE INDEX idx_clean_cmd_corral_state ON clean_cmd(corral_id, state);
 -- Garante que não existe mais do que um comando ativo em simultâneo no mesmo curral
 CREATE UNIQUE INDEX uq_clean_cmd_active_per_corral
     ON clean_cmd(corral_id)
-    WHERE state IN ('AGUARDANDO_CONFIRMACAO', 'PENDENTE_ENVIO', 'ENVIADO');
+    WHERE state IN ('PENDENTE', 'EM_ANDAMENTO');
 
 CREATE TABLE identify_pendency (
                                    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
