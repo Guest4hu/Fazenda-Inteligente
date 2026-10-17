@@ -6,9 +6,7 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -18,6 +16,8 @@ import java.util.UUID;
 @Getter
 @Setter
 @NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class CleanCmd {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -42,10 +42,7 @@ public class CleanCmd {
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
-    @Column(name = "sent_at")
-    private LocalDateTime sentAt;
-    @Column(name = "confirmed_at")
-    private LocalDateTime confirmedAt;
+
 
 
     @PrePersist
