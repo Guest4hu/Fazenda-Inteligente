@@ -14,7 +14,7 @@ import java.util.UUID;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class CommandBombAck implements CommandReceiveMqtt {
+public class CommandPumpAck implements CommandReceiveMqtt {
 
     private final AckService ackService;
     private final ObjectMapper objectMapper;

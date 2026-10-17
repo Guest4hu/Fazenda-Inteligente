@@ -14,7 +14,7 @@ import java.util.UUID;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class CommandPubliserMqtt implements CommandPublisher {
+public class CommandPublisherMqtt implements CommandPublisher {
 
     private final MqttGateway mqttGateway;
     private final MqttProperties  mqttProperties;
