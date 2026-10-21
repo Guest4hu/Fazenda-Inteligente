@@ -1,4 +1,9 @@
 package com.usjt.a3.dto.response;
 
-public class AuthResponseDTO {
+public record AuthResponseDTO(
+        String token,
+        Long userId,
+        String name,
+        String email
+) {
 }

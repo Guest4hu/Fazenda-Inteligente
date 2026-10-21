@@ -2,9 +2,7 @@ package com.usjt.a3.model.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Size;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
@@ -12,7 +10,9 @@ import java.time.LocalDateTime;
 @Table(name = "users")
 @Getter
 @Setter
+@Builder
 @NoArgsConstructor
+@AllArgsConstructor
 public class User {
 
     @Id

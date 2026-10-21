@@ -96,13 +96,7 @@ public class CleanService {
         }
 
         // Salva comando inicial como EM_ANDAMENTO (o Hibernate gera o UUID automaticamente no persist)
-        CleanCmd cmd = CleanCmd.builder()
-                .corral(corral)
-                .cleanOrigin(origin)
-                .cleanState(CleanState.EM_ANDAMENTO)
-                .secondsDuration(duration)
-                .build();
-
+        CleanCmd cmd = cleanCmdMapper.toEntity(corral, origin, duration);
         CleanCmd savedCmd = cleanCmdRepository.save(cmd);
         UUID commandId = savedCmd.getId();
         log.info("Comando de limpeza {} registrado em EM_ANDAMENTO para o curral {}", commandId, corralId);

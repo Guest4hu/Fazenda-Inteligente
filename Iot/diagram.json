@@ -55,19 +55,14 @@
     [ "gas1:VCC", "bb1:bp.30", "red", [] ],
     [ "gas1:GND", "bb1:tn.30", "black", [] ],
 
-    [ "gas1:DOUT", "bb1:35t.a", "blue", [] ],
+    [ "gas1:D0", "bb1:35t.a", "blue", [] ],
     [ "r4:1", "bb1:35t.b", "blue", [] ],
     [ "r4:2", "bb1:36t.b", "blue", [] ],
     [ "r5:1", "bb1:36t.c", "blue", [] ],
     [ "r5:2", "bb1:tn.36", "black", [] ],
     [ "bb1:36t.e", "esp:33", "blue", [] ],
 
-    [ "gas1:AOUT", "bb1:38t.a", "purple", [] ],
-    [ "r1:1", "bb1:38t.b", "purple", [] ],
-    [ "r1:2", "bb1:42t.b", "purple", [] ],
-    [ "r2:1", "bb1:42t.c", "black", [] ],
-    [ "r2:2", "bb1:tn.34", "black", [] ],
-    [ "bb1:42t.e", "esp:34", "purple", [] ],
+    [ "gas1:A0", "esp:34", "purple", [] ],
 
     [ "relay1:VCC", "bb1:bp.42", "red", [] ],
     [ "relay1:COM", "bb1:bp.44", "red", [] ],
