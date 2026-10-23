@@ -2,9 +2,7 @@ package com.usjt.a3.model.entity;
 
 import com.usjt.a3.model.enums.AnimalEventType;
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
@@ -12,7 +10,9 @@ import java.time.LocalDateTime;
 @Table(name = "identify_pendency")
 @Getter
 @Setter
+@Builder
 @NoArgsConstructor
+@AllArgsConstructor
 public class IdentifyPendency {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

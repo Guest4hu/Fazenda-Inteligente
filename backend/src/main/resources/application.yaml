@@ -20,5 +20,5 @@ mqtt:
 api:
   security:
       token:
-        secret: ${JWT_TOKEN}
-        issuer: ${JWT_ISSUER}
+        secret: ${JWT_TOKEN:chave-secreta-padrao-desenvolvimento-a3-usjt-1234567890}
+        issuer: ${JWT_ISSUER:a3-fazenda}

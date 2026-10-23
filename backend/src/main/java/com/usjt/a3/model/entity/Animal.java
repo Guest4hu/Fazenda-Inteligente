@@ -2,17 +2,15 @@ package com.usjt.a3.model.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Size;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-
-import java.awt.*;
+import lombok.*;
 
 @Entity
 @Table(name = "animals")
 @Getter
 @Setter
+@Builder
 @NoArgsConstructor
+@AllArgsConstructor
 public class Animal {
 
     @Id

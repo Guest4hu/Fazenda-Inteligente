@@ -11,6 +11,7 @@ import java.util.Optional;
 public interface AnimalEventRepository extends JpaRepository<AnimalEvent, Long> {
 
     // 1. Linha do tempo de presenças do curral (Dashboard)
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"corral", "animal"})
     List<AnimalEvent> findByCorralIdOrderByInstantDesc(Long corralId);
 
     // 2. Histórico de movimentações de um animal específico

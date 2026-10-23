@@ -3,9 +3,7 @@ package com.usjt.a3.model.entity;
 import com.usjt.a3.model.enums.AnimalEventType;
 import com.usjt.a3.model.enums.EventOrigin;
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
@@ -13,7 +11,9 @@ import java.time.LocalDateTime;
 @Table(name = "animal_event")
 @Getter
 @Setter
+@Builder
 @NoArgsConstructor
+@AllArgsConstructor
 public class AnimalEvent {
 
     @Id
