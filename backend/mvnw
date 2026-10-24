@@ -43,6 +43,14 @@ esac
 
 # set JAVACMD and JAVACCMD
 set_java_home() {
+  # Auto-select JDK 25 from ~/.jdks/temurin-25.0.4.1 when JAVA_HOME is unset or points to an older JDK (e.g. IntelliJ JBR 21)
+  if [ -d "${HOME-}/.jdks/temurin-25.0.4.1" ]; then
+    if [ -z "${JAVA_HOME-}" ] || ! "$JAVA_HOME/bin/javac" -version 2>&1 | grep -q " 25"; then
+      JAVA_HOME="$HOME/.jdks/temurin-25.0.4.1"
+      export JAVA_HOME
+    fi
+  fi
+
   # For Cygwin and MinGW, ensure paths are in Unix format before anything is touched
   if [ -n "${JAVA_HOME-}" ]; then
     if [ -x "$JAVA_HOME/jre/sh/java" ]; then
@@ -146,6 +154,12 @@ MAVEN_USER_HOME="${MAVEN_USER_HOME:-${HOME}/.m2}"
 MAVEN_HOME="${MAVEN_USER_HOME}/wrapper/dists/${distributionUrlNameMain-}/$(hash_string "$distributionUrl")"
 
 exec_maven() {
+  if [ -d "${HOME-}/.jdks/temurin-25.0.4.1" ]; then
+    if [ -z "${JAVA_HOME-}" ] || [ ! -x "$JAVA_HOME/bin/javac" ] || ! "$JAVA_HOME/bin/javac" -version 2>&1 | grep -q " 25"; then
+      JAVA_HOME="$HOME/.jdks/temurin-25.0.4.1"
+      export JAVA_HOME
+    fi
+  fi
   unset MVNW_VERBOSE MVNW_USERNAME MVNW_PASSWORD MVNW_REPOURL || :
   exec "$MAVEN_HOME/bin/$MVN_CMD" "$@" || die "cannot exec $MAVEN_HOME/bin/$MVN_CMD"
 }
