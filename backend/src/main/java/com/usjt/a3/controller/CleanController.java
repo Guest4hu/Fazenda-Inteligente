@@ -10,6 +10,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/currais")
 @RequiredArgsConstructor
@@ -25,6 +27,14 @@ public class CleanController {
     ) {
         CleanCmdResponseDTO responseDTO = cleanService.triggerManualClean(corralId, user.id(), request);
         return ResponseEntity.ok(responseDTO);
+    }
+
+    @GetMapping({"/{corralId}/limpeza", "/{corralId}/limpezas"})
+    public ResponseEntity<List<CleanCmdResponseDTO>> listCleanHistory(
+            @PathVariable Long corralId,
+            @AuthenticationPrincipal UserPrincipal user
+    ) {
+        return ResponseEntity.ok(cleanService.listCleanHistory(corralId, user.id()));
     }
 
 }

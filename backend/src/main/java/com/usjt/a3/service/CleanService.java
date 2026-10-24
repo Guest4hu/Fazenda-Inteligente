@@ -8,14 +8,18 @@ import com.usjt.a3.model.entity.Corral;
 import com.usjt.a3.model.enums.CleanOrigin;
 import com.usjt.a3.model.enums.CleanState;
 import com.usjt.a3.model.enums.ComandResult;
+import com.usjt.a3.model.enums.DeviceStatus;
 import com.usjt.a3.repository.AnimalRepository;
 import com.usjt.a3.repository.CleanCmdRepository;
 import com.usjt.a3.repository.CorralRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -29,6 +33,9 @@ public class CleanService {
     private final CleanCmdMapper cleanCmdMapper;
     private final AckService ackService;
     private final CommandPublisher commandPublisher;
+
+    @Autowired(required = false)
+    private CorralSseService corralSseService;
 
     /**
      * 1. GATILHO MANUAL (Via API REST / Usuário Logado)
@@ -95,6 +102,10 @@ public class CleanService {
             throw new IllegalStateException("A bomba já está em andamento para este curral");
         }
 
+        if(corral.getDeviceStatus() == DeviceStatus.OFFLINE || corral.getLastSeenAt() == null || corral.getLastSeenAt().isBefore(LocalDateTime.now().minusSeconds(60)) ) {
+            throw new IllegalStateException("O dispositovo deste curral esta offline ou sem comunicação recente, Verifique a conexão antes de acionar a bomba");
+        }
+
         // Salva comando inicial como EM_ANDAMENTO (o Hibernate gera o UUID automaticamente no persist)
         CleanCmd cmd = cleanCmdMapper.toEntity(corral, origin, duration);
         CleanCmd savedCmd = cleanCmdRepository.save(cmd);
@@ -130,7 +141,11 @@ public class CleanService {
                 ? "Bomba acionada e confirmada com sucesso!"
                 : "Aviso: Dispositivo não respondeu a tempo ou reportou falha";
 
-        return cleanCmdMapper.toDto(savedCmd, message);
+        CleanCmdResponseDTO dto = cleanCmdMapper.toDto(savedCmd, message);
+        if (corralSseService != null) {
+            corralSseService.sendEvent(corralId, "limpeza", dto);
+        }
+        return dto;
     }
 
     /**
@@ -138,5 +153,20 @@ public class CleanService {
      */
     public CleanCmdResponseDTO createCleanCMD(Long corralId, Long userId, CleanCmdRequestDTO request) {
         return triggerManualClean(corralId, userId, request);
+    }
+
+    public List<CleanCmdResponseDTO> listCleanHistory(Long corralId, Long userId) {
+        if (!corralRepository.existsById(corralId)) {
+            throw new EntityNotFoundException("Não foi encontrado este curral com ID: " + corralId);
+        }
+
+        if (!corralRepository.existsByIdAndFarmUserId(corralId, userId)) {
+            throw new SecurityException("Você não tem permissão para visualizar o histórico deste curral");
+        }
+
+        return cleanCmdRepository.findByCorralIdOrderByCreatedAtDesc(corralId)
+                .stream()
+                .map(cleanCmdMapper::toDTO)
+                .toList();
     }
 }

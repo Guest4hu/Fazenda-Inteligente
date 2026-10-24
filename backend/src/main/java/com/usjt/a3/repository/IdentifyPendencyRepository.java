@@ -17,4 +17,7 @@ public interface IdentifyPendencyRepository extends JpaRepository<IdentifyPenden
 
     // 3. Contador de pendências para exibir badge/alerta no painel
     long countByResolvedFalse();
+
+    // 4. Contador de pendências abertas para um curral específico
+    long countByCorralIdAndResolvedFalse(Long corralId);
 }

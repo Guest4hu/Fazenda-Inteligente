@@ -41,6 +41,8 @@ public class AnimalEvent {
 
     @PrePersist
     public void prePersist() {
-        instant = LocalDateTime.now();
+        if (this.instant == null) {
+            this.instant = LocalDateTime.now();
+        }
     }
 }

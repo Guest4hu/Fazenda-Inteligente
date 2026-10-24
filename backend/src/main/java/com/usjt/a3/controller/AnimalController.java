@@ -44,23 +44,59 @@ public class AnimalController {
     }
 
     // 3. Registrar movimentação de presença RFID (Entrou / Saiu do curral)
-    @PostMapping("/currais/{corralId}/presenca")
+    @PostMapping({"/currais/{corralId}/presenca", "/farms/{farmId}/currais/{corralId}/presenca"})
     public ResponseEntity<AnimalEventResponseDTO> registerPresence(
             @PathVariable Long corralId,
+            @PathVariable(required = false) Long farmId,
             @RequestBody @Valid AnimalPresenceRequestDTO request,
             @AuthenticationPrincipal UserPrincipal user
     ) {
-        AnimalEventResponseDTO response = animalService.registerPresence(corralId, user.id(), request);
+        AnimalEventResponseDTO response = animalService.registerPresence(corralId, farmId, user.id(), request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     // 4. Linha do tempo de presenças do curral
-    @GetMapping("/currais/{corralId}/eventos")
+    @GetMapping({"/currais/{corralId}/eventos", "/farms/{farmId}/currais/{corralId}/eventos"})
     public ResponseEntity<List<AnimalEventResponseDTO>> listEvents(
             @PathVariable Long corralId,
+            @PathVariable(required = false) Long farmId,
             @AuthenticationPrincipal UserPrincipal user
     ) {
-        List<AnimalEventResponseDTO> list = animalService.listEventsByCorral(corralId, user.id());
+        List<AnimalEventResponseDTO> list = animalService.listEventsByCorral(corralId, farmId, user.id());
         return ResponseEntity.ok(list);
+    }
+
+    // 5. Atualizar animal
+    @PutMapping({"/animais/{animalId}", "/farms/{farmId}/animais/{animalId}"})
+    public ResponseEntity<AnimalResponseDTO> updateAnimal(
+            @PathVariable Long animalId,
+            @PathVariable(required = false) Long farmId,
+            @RequestBody @Valid AnimalRequestDTO request,
+            @AuthenticationPrincipal UserPrincipal user
+    ) {
+        AnimalResponseDTO response = animalService.updateAnimal(animalId, farmId, user.id(), request);
+        return ResponseEntity.ok(response);
+    }
+
+    // 6. Excluir animal
+    @DeleteMapping({"/animais/{animalId}", "/farms/{farmId}/animais/{animalId}"})
+    public ResponseEntity<Void> deleteAnimal(
+            @PathVariable Long animalId,
+            @PathVariable(required = false) Long farmId,
+            @AuthenticationPrincipal UserPrincipal user
+    ) {
+        animalService.deleteAnimal(animalId, farmId, user.id());
+        return ResponseEntity.noContent().build();
+    }
+
+    // 7. Buscar animal por ID
+    @GetMapping({"/animais/{animalId}", "/farms/{farmId}/animais/{animalId}"})
+    public ResponseEntity<AnimalResponseDTO> getAnimal(
+            @PathVariable Long animalId,
+            @PathVariable(required = false) Long farmId,
+            @AuthenticationPrincipal UserPrincipal user
+    ) {
+        AnimalResponseDTO response = animalService.getAnimalById(animalId, farmId, user.id());
+        return ResponseEntity.ok(response);
     }
 }

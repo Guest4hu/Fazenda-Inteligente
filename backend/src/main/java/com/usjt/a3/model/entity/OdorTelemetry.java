@@ -25,7 +25,7 @@ public class OdorTelemetry {
 
     @Column(nullable = false)
     @PositiveOrZero
-    @Max(1000)
+    @Max(10000)
     private Integer value;
 
     @Column(nullable = false, updatable = false)

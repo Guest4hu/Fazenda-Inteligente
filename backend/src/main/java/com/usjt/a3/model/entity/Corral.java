@@ -1,5 +1,6 @@
 package com.usjt.a3.model.entity;
 
+import com.usjt.a3.model.enums.DeviceStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
@@ -43,6 +44,23 @@ public class Corral {
     @Positive
     @Max(60)
     private Integer pumpDurationSeconds;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "device_status", nullable = false)
+    @Builder.Default
+    private DeviceStatus deviceStatus = DeviceStatus.OFFLINE;
+
+    @Column(name = "last_seen_at")
+    private LocalDateTime lastSeenAt;
+
+    @PrePersist
+    public void prePersist() {
+        if (this.deviceStatus == null) {
+            this.deviceStatus = DeviceStatus.OFFLINE;
+        }
+    }
+
+
 
 
 }

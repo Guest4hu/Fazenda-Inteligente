@@ -14,4 +14,7 @@ public interface FarmRepository extends JpaRepository<Farm, Long> {
 
     // 2. Checar se já existe fazenda com o mesmo nome para aquele usuário
     boolean existsByNameAndUserId(String name, Long userId);
+
+    // 3. Checar se já existe outra fazenda com o mesmo nome para aquele usuário (excluindo a própria pelo ID)
+    boolean existsByNameAndUserIdAndIdNot(String name, Long userId, Long id);
 }

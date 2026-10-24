@@ -21,4 +21,8 @@ public interface CorralRepository extends JpaRepository<Corral, Long> {
     boolean existsByIdAndFarmUserId(Long corralId, Long userId);
 
     boolean existsByMacAddress(String macAddress);
+
+    boolean existsByMacAddressAndIdNot(String macAddress, Long id);
+
+    List<Corral> findByCleanTimeIsNotNull();
 }

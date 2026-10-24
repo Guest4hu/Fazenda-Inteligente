@@ -1,5 +1,8 @@
 package com.usjt.a3.dto.response;
 
+import com.usjt.a3.model.enums.DeviceStatus;
+
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 public record CorralResponseDTO(
@@ -9,6 +12,8 @@ public record CorralResponseDTO(
         String macAddress,
         LocalTime cleanTime,
         Integer limitOdor,
-        Integer pumpDurationSeconds
+        Integer pumpDurationSeconds,
+        DeviceStatus deviceStatus,
+        LocalDateTime lastSeenAt
 ) {
 }

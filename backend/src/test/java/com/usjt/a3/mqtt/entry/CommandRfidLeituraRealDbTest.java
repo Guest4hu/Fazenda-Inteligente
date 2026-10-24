@@ -2,10 +2,13 @@ package com.usjt.a3.mqtt.entry;
 
 import com.usjt.a3.model.entity.Animal;
 import com.usjt.a3.model.entity.AnimalEvent;
+import com.usjt.a3.model.entity.Corral;
 import com.usjt.a3.model.enums.AnimalEventType;
 import com.usjt.a3.model.enums.EventOrigin;
 import com.usjt.a3.repository.AnimalEventRepository;
 import com.usjt.a3.repository.AnimalRepository;
+import com.usjt.a3.repository.CorralRepository;
+import com.usjt.a3.repository.IdentifyPendencyRepository;
 import com.usjt.a3.service.CleanService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -34,15 +37,39 @@ class CommandRfidLeituraRealDbTest {
     private AnimalEventRepository animalEventRepository;
 
     @Autowired
+    private CorralRepository corralRepository;
+
+    @Autowired
+    private IdentifyPendencyRepository identifyPendencyRepository;
+
+    @Autowired
     private CleanService cleanService;
 
-    private static final String MAC_CURRAL_1 = "240AC4000220";
+    private static final String MAC_CURRAL_1 = "240AC4000110";
     private static final String TAG_VACA_MIMOSA = "E2801160";
+
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        Corral corral = corralRepository.findById(1L).orElseThrow();
+        animalRepository.findByTagUid(TAG_VACA_MIMOSA).orElseGet(() -> {
+            Animal novo = new Animal();
+            novo.setName("Vaca Mimosa");
+            novo.setIdentification("BR-2024-01");
+            novo.setTagUid(TAG_VACA_MIMOSA);
+            novo.setFarm(corral.getFarm());
+            return animalRepository.save(novo);
+        });
+    }
 
     @Test
     @Order(1)
     @DisplayName("Processa saída de vaca via RFID, limpando current_corral_id no PostgreSQL e gravando AnimalEvent")
     void testarRfidLeituraSaiuAtualizaBancoEDestravaLimpeza() {
+        Corral corralInicial = corralRepository.findByMacAddress(MAC_CURRAL_1).orElseThrow();
+        Animal animalInicial = animalRepository.findByTagUid(TAG_VACA_MIMOSA).orElseThrow();
+        animalInicial.setCurrentCorral(corralInicial);
+        animalRepository.save(animalInicial);
+
         String payloadSaiu = """
                 {
                     "tagUid": "%s",
@@ -76,7 +103,7 @@ class CommandRfidLeituraRealDbTest {
                 }
                 """.formatted(TAG_VACA_MIMOSA);
 
-        String macComDoisPontos = "24:0A:C4:00:02:20";
+        String macComDoisPontos = "24:0A:C4:00:01:10";
         assertDoesNotThrow(() -> commandRfidLeitura.tratar(macComDoisPontos, payloadEntrou));
 
         Animal animal = animalRepository.findByTagUid(TAG_VACA_MIMOSA).orElseThrow();
@@ -93,7 +120,7 @@ class CommandRfidLeituraRealDbTest {
 
     @Test
     @Order(3)
-    @DisplayName("Garante resiliência ao receber leitura de tag não cadastrada sem derrubar a aplicação")
+    @DisplayName("Garante resiliência ao receber leitura de tag não cadastrada, gerando registro em identify_pendency")
     void testarRfidLeituraTagDesconhecidaNaoQuebraSistema() {
         String payload = """
                 {
@@ -103,6 +130,10 @@ class CommandRfidLeituraRealDbTest {
                 """;
 
         assertDoesNotThrow(() -> commandRfidLeitura.tratar(MAC_CURRAL_1, payload));
+
+        var pendencias = identifyPendencyRepository.findByCorralIdAndResolvedFalseOrderByInstantDesc(1L);
+        assertFalse(pendencias.isEmpty(), "Deve existir pendência de identificação criada no banco");
+        assertTrue(pendencias.stream().anyMatch(p -> "TAG_INEXISTENTE_9999".equals(p.getTagUid())));
     }
 
     @Test
@@ -125,5 +156,11 @@ class CommandRfidLeituraRealDbTest {
             animal.setCurrentCorral(null);
             animalRepository.save(animal);
         });
+        identifyPendencyRepository.deleteAll(
+                identifyPendencyRepository.findByCorralIdAndResolvedFalseOrderByInstantDesc(1L)
+                        .stream()
+                        .filter(p -> "TAG_INEXISTENTE_9999".equals(p.getTagUid()))
+                        .toList()
+        );
     }
 }

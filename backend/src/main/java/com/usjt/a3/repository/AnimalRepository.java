@@ -20,4 +20,9 @@ public interface AnimalRepository extends JpaRepository<Animal, Long> {
 
     boolean existsByTagUid(String tagUid);
 
+    boolean existsByTagUidAndIdNot(String tagUid, Long id);
+
+    long countByCurrentCorralId(Long corralId);
+
+    long countByFarmId(Long farmId);
 }

@@ -5,20 +5,26 @@ import com.usjt.a3.dto.response.FarmResponseDTO;
 import com.usjt.a3.mapper.FarmMapper;
 import com.usjt.a3.model.entity.Farm;
 import com.usjt.a3.model.entity.User;
+import com.usjt.a3.model.enums.CleanState;
+import com.usjt.a3.repository.CleanCmdRepository;
 import com.usjt.a3.repository.FarmRepository;
 import com.usjt.a3.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class FarmService {
     private final FarmRepository farmRepository;
     private final UserRepository userRepository;
     private final FarmMapper farmMapper;
+    private final CleanCmdRepository cleanCmdRepository;
 
     public FarmResponseDTO createFarm(FarmRequestDTO farmRequestDTO, Long userID) {
         User user = userRepository.findById(userID).orElseThrow(() -> new EntityNotFoundException("Não existe tal usuario cadastrado")
@@ -39,4 +45,41 @@ public class FarmService {
                 .toList();
     }
 
+    @Transactional
+    public FarmResponseDTO updateFarm(Long farmId, FarmRequestDTO farmRequestDTO, Long userId) {
+        Farm farm = farmRepository.findById(farmId)
+                .orElseThrow(() -> new EntityNotFoundException("Fazenda não encontrada com ID: " + farmId));
+
+        if (!farm.getUser().getId().equals(userId)) {
+            throw new SecurityException("Você não tem permissão para editar esta fazenda");
+        }
+
+        String trimmedName = farmRequestDTO.name().trim();
+        if (farmRepository.existsByNameAndUserIdAndIdNot(trimmedName, userId, farmId)) {
+            throw new IllegalStateException("Você já possui uma fazenda cadastrada com este nome: " + trimmedName);
+        }
+
+        farm.setName(trimmedName);
+        Farm updatedFarm = farmRepository.save(farm);
+        log.info("Fazenda ID {} atualizada com sucesso pelo usuário ID {}. Novo nome: '{}'", farmId, userId, trimmedName);
+
+        return farmMapper.toDTO(updatedFarm);
+    }
+
+    @Transactional
+    public void deleteFarm(Long farmId, Long userId) {
+        Farm farm = farmRepository.findById(farmId)
+                .orElseThrow(() -> new EntityNotFoundException("Fazenda não encontrada com ID: " + farmId));
+
+        if (!farm.getUser().getId().equals(userId)) {
+            throw new SecurityException("Você não tem permissão para excluir esta fazenda");
+        }
+
+        if (cleanCmdRepository.existsByCorralFarmIdAndCleanState(farmId, CleanState.EM_ANDAMENTO)) {
+            throw new IllegalStateException("Não é possível excluir a fazenda pois existe um curral com limpeza em andamento");
+        }
+
+        farmRepository.delete(farm);
+        log.info("Fazenda '{}' (ID: {}) excluída com sucesso pelo usuário ID {}", farm.getName(), farmId, userId);
+    }
 }

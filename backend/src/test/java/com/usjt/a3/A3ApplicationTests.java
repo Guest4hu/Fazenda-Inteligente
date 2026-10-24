@@ -12,11 +12,20 @@ class A3ApplicationTests {
     @Autowired
     private CleanService cleanService;
 
+    @Autowired
+    private com.usjt.a3.repository.CorralRepository corralRepository;
+
     @Test
     void testarDisparoLimpezaComWokwi() {
         System.out.println("\n=======================================================");
         System.out.println(">>> 1. DISPARANDO COMANDO DE LIMPEZA PELO BACKEND... <<<");
         System.out.println("=======================================================");
+
+        corralRepository.findById(1L).ifPresent(corral -> {
+            corral.setDeviceStatus(com.usjt.a3.model.enums.DeviceStatus.ONLINE);
+            corral.setLastSeenAt(java.time.LocalDateTime.now());
+            corralRepository.save(corral);
+        });
 
         // Dispara para o Curral 1, Usuário 1 (o que criamos no banco)
         CleanCmdResponseDTO response = cleanService.triggerManualClean(1L, 1L, null);

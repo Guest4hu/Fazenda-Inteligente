@@ -7,9 +7,10 @@ import com.usjt.a3.model.enums.AnimalEventType;
 import com.usjt.a3.model.enums.EventOrigin;
 import com.usjt.a3.repository.CorralRepository;
 import com.usjt.a3.service.AnimalService;
+import com.usjt.a3.service.IdentifyPendencyService;
 import jakarta.persistence.EntityNotFoundException;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -18,12 +19,30 @@ import java.util.Optional;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class CommandRfidLeitura implements CommandReceiveMqtt {
 
     private final CorralRepository corralRepository;
     private final AnimalService animalService;
+    private final IdentifyPendencyService identifyPendencyService;
     private final ObjectMapper objectMapper;
+
+    @Autowired
+    public CommandRfidLeitura(CorralRepository corralRepository,
+                              AnimalService animalService,
+                              IdentifyPendencyService identifyPendencyService,
+                              ObjectMapper objectMapper) {
+        this.corralRepository = corralRepository;
+        this.animalService = animalService;
+        this.identifyPendencyService = identifyPendencyService;
+        this.objectMapper = objectMapper;
+    }
+
+    @Deprecated
+    public CommandRfidLeitura(CorralRepository corralRepository,
+                              AnimalService animalService,
+                              ObjectMapper objectMapper) {
+        this(corralRepository, animalService, null, objectMapper);
+    }
 
     @Override
     public EntryTopics topico() {
@@ -105,13 +124,21 @@ public class CommandRfidLeitura implements CommandReceiveMqtt {
             log.info("Processando leitura RFID | Curral MAC: {} (ID: {}) | Usuário ID: {} | Tag: {} | Evento: {}",
                     normalizedMac, corralId, userId, normalizedTagUid, typeEvent);
 
-            animalService.registerPresence(corralId, userId, requestDTO);
+            try {
+                animalService.registerPresence(corralId, userId, requestDTO);
+                log.info("Presença RFID registrada com sucesso | Curral ID: {} | Tag: {} | Evento: {}",
+                        corralId, normalizedTagUid, typeEvent);
+            } catch (EntityNotFoundException e) {
+                log.warn("Falha ao registrar presença RFID para o curral MAC {}: {}", normalizedMac, e.getMessage());
+                if (identifyPendencyService != null) {
+                    try {
+                        identifyPendencyService.createPendency(corral, normalizedTagUid, typeEvent);
+                    } catch (Exception ex) {
+                        log.error("Erro ao registrar pendência para o curral MAC {}: {}", normalizedMac, ex.getMessage(), ex);
+                    }
+                }
+            }
 
-            log.info("Presença RFID registrada com sucesso | Curral ID: {} | Tag: {} | Evento: {}",
-                    corralId, normalizedTagUid, typeEvent);
-
-        } catch (EntityNotFoundException e) {
-            log.warn("Falha ao registrar presença RFID para o curral MAC {}: {}", normalizedMac, e.getMessage());
         } catch (SecurityException e) {
             log.warn("Falha de permissão ao registrar presença RFID para o curral MAC {}: {}", normalizedMac, e.getMessage());
         } catch (IllegalStateException e) {

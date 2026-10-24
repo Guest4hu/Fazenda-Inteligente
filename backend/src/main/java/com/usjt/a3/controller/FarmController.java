@@ -33,5 +33,21 @@ public class FarmController {
         return ResponseEntity.ok(farmService.findAllFarm(user.id()));
     }
 
+    @PutMapping("/{farmId}")
+    public ResponseEntity<FarmResponseDTO> update(
+            @PathVariable Long farmId,
+            @RequestBody @Valid FarmRequestDTO farmRequestDTO,
+            @AuthenticationPrincipal UserPrincipal user
+    ) {
+        return ResponseEntity.ok(farmService.updateFarm(farmId, farmRequestDTO, user.id()));
+    }
 
+    @DeleteMapping("/{farmId}")
+    public ResponseEntity<Void> delete(
+            @PathVariable Long farmId,
+            @AuthenticationPrincipal UserPrincipal user
+    ) {
+        farmService.deleteFarm(farmId, user.id());
+        return ResponseEntity.noContent().build();
+    }
 }

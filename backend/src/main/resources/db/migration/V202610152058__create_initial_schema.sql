@@ -32,8 +32,11 @@ CREATE TABLE corral (
                         clean_time TIME NULL,
                         limit_odor INTEGER NOT NULL DEFAULT 400,
                         pump_duration_seconds INTEGER NOT NULL DEFAULT 30,
+                        device_status VARCHAR(15) NOT NULL DEFAULT 'OFFLINE',
+                        last_seen_at TIMESTAMPTZ NULL,
                         CONSTRAINT chk_corral_mac_address CHECK (mac_address ~ '^[0-9A-F]{12}$'),
-                        CONSTRAINT chk_corral_pump_duration CHECK (pump_duration_seconds > 0)
+                        CONSTRAINT chk_corral_pump_duration CHECK (pump_duration_seconds > 0),
+                        CONSTRAINT chk_corral_device_status CHECK (device_status IN ('ONLINE', 'OFFLINE'))
 );
 
 CREATE INDEX idx_corral_farm_id ON corral(farm_id);

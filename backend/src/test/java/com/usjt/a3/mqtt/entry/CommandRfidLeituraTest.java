@@ -10,6 +10,7 @@ import com.usjt.a3.model.enums.AnimalEventType;
 import com.usjt.a3.model.enums.EventOrigin;
 import com.usjt.a3.repository.CorralRepository;
 import com.usjt.a3.service.AnimalService;
+import com.usjt.a3.service.IdentifyPendencyService;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,6 +35,9 @@ class CommandRfidLeituraTest {
     @Mock
     private AnimalService animalService;
 
+    @Mock
+    private IdentifyPendencyService identifyPendencyService;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private CommandRfidLeitura commandRfidLeitura;
@@ -44,7 +48,7 @@ class CommandRfidLeituraTest {
 
     @BeforeEach
     void setUp() {
-        commandRfidLeitura = new CommandRfidLeitura(corralRepository, animalService, objectMapper);
+        commandRfidLeitura = new CommandRfidLeitura(corralRepository, animalService, identifyPendencyService, objectMapper);
 
         user = User.builder().id(1L).email("user@test.com").name("Produtor").build();
         farm = Farm.builder().id(2L).name("Fazenda Boa Esperança").user(user).build();
@@ -283,6 +287,79 @@ class CommandRfidLeituraTest {
         assertDoesNotThrow(() -> commandRfidLeitura.tratar("240AC4000110", payload));
 
         verify(animalService).registerPresence(eq(3L), eq(1L), any(AnimalPresenceRequestDTO.class));
+        verify(identifyPendencyService).createPendency(eq(corral), eq("E2801160"), eq(AnimalEventType.ENTROU));
+    }
+
+    @Test
+    void tratarTagDesconhecidaComEventoSaiuCriaPendenciaComTipoSaiu() {
+        when(corralRepository.findByMacAddress("240AC4000110")).thenReturn(Optional.of(corral));
+        when(animalService.registerPresence(anyLong(), anyLong(), any(AnimalPresenceRequestDTO.class)))
+                .thenThrow(new EntityNotFoundException("Nenhum animal cadastrado"));
+
+        String payload = """
+                {
+                    "tagUid": "UNKNOWN_TAG_99",
+                    "typeEvent": "SAIU"
+                }
+                """;
+
+        commandRfidLeitura.tratar("240AC4000110", payload);
+
+        verify(identifyPendencyService).createPendency(eq(corral), eq("UNKNOWN_TAG_99"), eq(AnimalEventType.SAIU));
+    }
+
+    @Test
+    void tratarTagDesconhecidaEmMinusculasNormalizaParaMaiusculasNaPendencia() {
+        when(corralRepository.findByMacAddress("240AC4000110")).thenReturn(Optional.of(corral));
+        when(animalService.registerPresence(anyLong(), anyLong(), any(AnimalPresenceRequestDTO.class)))
+                .thenThrow(new EntityNotFoundException("Nenhum animal cadastrado"));
+
+        String payload = """
+                {
+                    "tagUid": "e2801160ab",
+                    "typeEvent": "ENTROU"
+                }
+                """;
+
+        commandRfidLeitura.tratar("240AC4000110", payload);
+
+        verify(identifyPendencyService).createPendency(eq(corral), eq("E2801160AB"), eq(AnimalEventType.ENTROU));
+    }
+
+    @Test
+    void tratarTagConhecidaComSucessoNaoCriaPendencia() {
+        when(corralRepository.findByMacAddress("240AC4000110")).thenReturn(Optional.of(corral));
+
+        String payload = """
+                {
+                    "tagUid": "E2801160",
+                    "typeEvent": "ENTROU"
+                }
+                """;
+
+        commandRfidLeitura.tratar("240AC4000110", payload);
+
+        verify(animalService).registerPresence(eq(3L), eq(1L), any(AnimalPresenceRequestDTO.class));
+        verifyNoInteractions(identifyPendencyService);
+    }
+
+    @Test
+    void tratarFalhaAoCriarPendenciaNaoDerrubaThreadMqtt() {
+        when(corralRepository.findByMacAddress("240AC4000110")).thenReturn(Optional.of(corral));
+        when(animalService.registerPresence(anyLong(), anyLong(), any(AnimalPresenceRequestDTO.class)))
+                .thenThrow(new EntityNotFoundException("Nenhum animal"));
+        when(identifyPendencyService.createPendency(any(), any(), any()))
+                .thenThrow(new RuntimeException("Falha de IO no banco"));
+
+        String payload = """
+                {
+                    "tagUid": "E2801160",
+                    "typeEvent": "ENTROU"
+                }
+                """;
+
+        assertDoesNotThrow(() -> commandRfidLeitura.tratar("240AC4000110", payload));
+        verify(identifyPendencyService).createPendency(eq(corral), eq("E2801160"), eq(AnimalEventType.ENTROU));
     }
 
     @Test
