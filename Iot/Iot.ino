@@ -2,6 +2,9 @@
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include <DHT.h>
+#include <SPI.h>
+#include <MFRC522.h>
+#include <vector>
 
 // ============================================================================
 // CONFIGURAÇÕES DE REDE E BROKER MQTT
@@ -18,13 +21,17 @@ const char* TOPIC_PREFIX  = "a3-usjt-fazenda-inteligente/curral";
 // ============================================================================
 // PINOS DO HARDWARE (ESP32)
 // ============================================================================
-#define PIN_RELE   26   // Relé da Bomba d'água
-#define PIN_PIR    27   // Sensor de Presença de Animais (PIR)
-#define PIN_DHT    32   // Sensor DHT22 (Temperatura e Umidade)
-#define PIN_MQ135  34   // Sensor de Odor/Gás (Amônia/Fezes)
+#define PIN_RELE      26   // Relé da Bomba d'água
+#define PIN_PIR       27   // Sensor de Presença de Animais (PIR)
+#define PIN_DHT       32   // Sensor DHT22 (Temperatura e Umidade)
+#define PIN_MQ135     34   // Sensor de Odor/Gás (Amônia/Fezes)
+#define PIN_RFID_SS   5    // MFRC522 SDA/SS (SPI)
+#define PIN_RFID_RST  21   // MFRC522 RST (SPI)
+// Pinos SPI padrão ESP32: SCK = 18, MISO = 19, MOSI = 23
 
 #define TIPO_DHT DHT22
 DHT dht(PIN_DHT, TIPO_DHT);
+MFRC522 rfid(PIN_RFID_SS, PIN_RFID_RST);
 
 WiFiClient espClient;
 PubSubClient mqttClient(espClient);
@@ -35,6 +42,35 @@ String topicComando = "";
 String topicAck = "";
 String topicOdor = "";
 String topicStatus = "";
+String topicRfid = "";
+
+// Rastreamento Individual de Animais Presentes no Curral
+std::vector<String> tagsNoCurral;
+unsigned long ultimoRfidLeitura = 0;
+
+// Verifica se um animal específico está dentro do curral
+bool isAnimalNoCurral(const String& tagUid) {
+  for (size_t i = 0; i < tagsNoCurral.size(); i++) {
+    if (tagsNoCurral[i].equalsIgnoreCase(tagUid)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Alterna a presença de um animal específico:
+// Se já estava dentro -> SAIU (remove da lista)
+// Se não estava dentro -> ENTROU (adiciona na lista)
+const char* alternarPresencaAnimal(const String& tagUid) {
+  for (size_t i = 0; i < tagsNoCurral.size(); i++) {
+    if (tagsNoCurral[i].equalsIgnoreCase(tagUid)) {
+      tagsNoCurral.erase(tagsNoCurral.begin() + i);
+      return "SAIU";
+    }
+  }
+  tagsNoCurral.push_back(tagUid);
+  return "ENTROU";
+}
 
 // Controle Não-Bloqueante da Bomba (millis)
 bool bombaAtiva = false;
@@ -70,6 +106,24 @@ void enviarAck(const char* comandoId, const char* status) {
   Serial.printf("[MQTT -> BACKEND] Payload: %s\n", buffer);
 
   mqttClient.publish(topicAck.c_str(), buffer, false);
+}
+
+// Publica evento de leitura RFID para o backend (presença de animal)
+void publicarPresencaRfid(String tagUid, const char* evento) {
+  StaticJsonDocument<128> doc;
+  doc["tagUid"] = tagUid;
+  doc["typeEvent"] = evento;
+
+  char buffer[128];
+  serializeJson(doc, buffer);
+
+  Serial.println("\n=======================================================");
+  Serial.printf("[RFID -> BACKEND] Publicando Evento: %s | Tag: %s\n", evento, tagUid.c_str());
+  Serial.printf("[RFID -> BACKEND] Tópico: %s\n", topicRfid.c_str());
+  Serial.printf("[RFID -> BACKEND] Payload: %s\n", buffer);
+  Serial.println("=======================================================");
+
+  mqttClient.publish(topicRfid.c_str(), buffer, false);
 }
 
 // Processa o comando recebido do CleanService do Backend
@@ -126,10 +180,10 @@ void conectarWifi() {
   Serial.println(WIFI_SSID);
 
   WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD, 6);
 
   while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
+    delay(250);
     Serial.print(".");
   }
 
@@ -143,10 +197,12 @@ void conectarWifi() {
   topicAck     = String(TOPIC_PREFIX) + "/" + macAddress + "/bomba/ack";
   topicOdor    = String(TOPIC_PREFIX) + "/" + macAddress + "/odor/nivel";
   topicStatus  = String(TOPIC_PREFIX) + "/" + macAddress + "/status";
+  topicRfid    = String(TOPIC_PREFIX) + "/" + macAddress + "/rfid/leitura";
 
   Serial.println("-------------------------------------------------------");
   Serial.printf(">>> MAC CADASTRADO NO CURRAL: %s <<<\n", macAddress.c_str());
   Serial.printf(">>> ASSINANDO COMANDOS EM: %s <<<\n", topicComando.c_str());
+  Serial.printf(">>> PUBLICANDO RFID EM: %s <<<\n", topicRfid.c_str());
   Serial.println("-------------------------------------------------------");
 }
 
@@ -155,7 +211,8 @@ void reconectarMqtt() {
   while (!mqttClient.connected()) {
     Serial.print("[MQTT] Tentando conectar ao Broker HiveMQ...");
 
-    String clientId = "ESP32-Curral-" + macAddress;
+    // Adiciona sufixo aleatório para evitar conflito de ClientID com outras instâncias no broker público
+    String clientId = "ESP32-Curral-" + macAddress + "-" + String(random(1000, 9999));
 
     // Conecta com Last Will (envia OFFLINE se perder sinal)
     if (mqttClient.connect(clientId.c_str(), topicStatus.c_str(), 1, true, "{\"status\":\"OFFLINE\"}")) {
@@ -171,15 +228,20 @@ void reconectarMqtt() {
     } else {
       Serial.print(" Falhou. Código de erro: ");
       Serial.print(mqttClient.state());
-      Serial.println(" Tentando novamente em 5 segundos...");
-      delay(5000);
+      Serial.println(" Tentando novamente em 3 segundos...");
+      delay(3000);
     }
   }
 }
 
 // Envia telemetria do MQ-135 e DHT22
 void enviarTelemetria() {
-  int leituraOdor = analogRead(PIN_MQ135);
+  int leituraBruta = analogRead(PIN_MQ135);
+  // O slider do sensor MQ no Wokwi vai de 0 a 10.000 ppm.
+  // Alimentado em 5V, a saída analógica do sensor no ADC de 12 bits do ESP32 varia de ~350 (ar limpo) a ~3950 (10k ppm).
+  int leituraOdor = map(leituraBruta, 350, 3950, 0, 10000);
+  leituraOdor = constrain(leituraOdor, 0, 10000);
+
   float temperatura = dht.readTemperature();
   float umidade = dht.readHumidity();
 
@@ -189,8 +251,8 @@ void enviarTelemetria() {
   char buffer[128];
   serializeJson(doc, buffer);
 
-  Serial.printf("[TELEMETRIA] Odor: %d | Temp: %.1f C | Umid: %.1f %% -> Publicando...\n",
-                leituraOdor, isnan(temperatura) ? 0.0 : temperatura, isnan(umidade) ? 0.0 : umidade);
+  Serial.printf("[TELEMETRIA] Odor: %d ppm (ADC Bruto: %d) | Temp: %.1f C | Umid: %.1f %% -> Publicando...\n",
+                leituraOdor, leituraBruta, isnan(temperatura) ? 0.0 : temperatura, isnan(umidade) ? 0.0 : umidade);
 
   mqttClient.publish(topicOdor.c_str(), buffer, false);
 }
@@ -211,12 +273,23 @@ void setup() {
 
   dht.begin();
 
+  // Inicializa o sensor RFID MFRC522 (SPI)
+  SPI.begin();
+  rfid.PCD_Init();
+  Serial.println("[HARDWARE] Sensor RFID MFRC522 inicializado!");
+
   // Conecta Wi-Fi e configura MQTT
   conectarWifi();
   mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
   mqttClient.setCallback(mqttCallback);
+  mqttClient.setBufferSize(512);
 
   Serial.println("[SISTEMA] Curral Inteligente pronto para receber comandos!");
+  Serial.println("[DICA DE TESTE] Teste com múltiplos bois:");
+  Serial.println("  - Digite 'entrou E2801160' ou 'entrou A1B2C3D4'");
+  Serial.println("  - Digite 'saiu E2801160' ou 'saiu A1B2C3D4'");
+  Serial.println("  - Digite 'status' para ver quem está dentro do curral");
+  Serial.println("  - Ou simplesmente aproxime diferentes cartões no sensor RFID!");
 }
 
 void loop() {
@@ -238,5 +311,81 @@ void loop() {
   if (millis() - ultimoEnvioTelemetria >= INTERVALO_TELEMETRIA) {
     ultimoEnvioTelemetria = millis();
     enviarTelemetria();
+  }
+
+  // 3. Leitura do Sensor RFID MFRC522 (Passagem de Animal no Wokwi ou Placa Física)
+  if (rfid.PICC_IsNewCardPresent() && rfid.PICC_ReadCardSerial()) {
+    if (millis() - ultimoRfidLeitura >= 2000) { // Debounce de 2s para evitar repetições
+      ultimoRfidLeitura = millis();
+
+      String tagUid = "";
+      for (byte i = 0; i < rfid.uid.size; i++) {
+        if (rfid.uid.uidByte[i] < 0x10) tagUid += "0";
+        tagUid += String(rfid.uid.uidByte[i], HEX);
+      }
+      tagUid.toUpperCase();
+
+      // Alterna a presença ESPECÍFICA DESTE ANIMAL:
+      // Se este animal já estava dentro -> SAIU
+      // Se este animal estava fora -> ENTROU
+      const char* evento = alternarPresencaAnimal(tagUid);
+
+      publicarPresencaRfid(tagUid, evento);
+      Serial.printf("[CURRAL] Boi '%s' %s | Total de animais no curral agora: %d\n",
+                    tagUid.c_str(), evento, tagsNoCurral.size());
+    }
+    rfid.PICC_HaltA();
+    rfid.PCD_StopCrypto1();
+  }
+
+  // 4. Atalho Interativo no Serial Monitor (suporta diferentes animais)
+  if (Serial.available() > 0) {
+    String input = Serial.readStringUntil('\n');
+    input.trim();
+
+    if (input.length() > 0) {
+      int spaceIndex = input.indexOf(' ');
+      String cmd = (spaceIndex > 0) ? input.substring(0, spaceIndex) : input;
+      String tagArg = (spaceIndex > 0) ? input.substring(spaceIndex + 1) : "";
+      cmd.toLowerCase();
+      tagArg.trim();
+      tagArg.toUpperCase();
+
+      // Se a tag não for especificada, usa a Vaca Mimosa como padrão
+      if (tagArg.length() == 0 && (cmd == "in" || cmd == "entrou" || cmd == "out" || cmd == "saiu")) {
+        tagArg = "E2801160";
+      }
+
+      if (cmd == "in" || cmd == "entrou") {
+        if (!isAnimalNoCurral(tagArg)) {
+          tagsNoCurral.push_back(tagArg);
+        }
+        publicarPresencaRfid(tagArg, "ENTROU");
+        Serial.printf("[CURRAL] Boi '%s' ENTROU | Total no curral: %d\n", tagArg.c_str(), tagsNoCurral.size());
+      } else if (cmd == "out" || cmd == "saiu") {
+        for (size_t i = 0; i < tagsNoCurral.size(); i++) {
+          if (tagsNoCurral[i].equalsIgnoreCase(tagArg)) {
+            tagsNoCurral.erase(tagsNoCurral.begin() + i);
+            break;
+          }
+        }
+        publicarPresencaRfid(tagArg, "SAIU");
+        Serial.printf("[CURRAL] Boi '%s' SAIU | Total no curral: %d\n", tagArg.c_str(), tagsNoCurral.size());
+      } else if (cmd == "status") {
+        Serial.println("\n-------------------------------------------------------");
+        Serial.printf("[STATUS CURRAL] Total de animais presentes: %d\n", tagsNoCurral.size());
+        for (size_t i = 0; i < tagsNoCurral.size(); i++) {
+          Serial.printf("  -> Boi Tag: %s\n", tagsNoCurral[i].c_str());
+        }
+        Serial.println("-------------------------------------------------------");
+      } else {
+        // Se digitou apenas uma Tag RFID (ex: E2801160 ou A1B2C3D4)
+        String tagDireta = input;
+        tagDireta.toUpperCase();
+        const char* evento = alternarPresencaAnimal(tagDireta);
+        publicarPresencaRfid(tagDireta, evento);
+        Serial.printf("[CURRAL] Boi '%s' %s | Total no curral: %d\n", tagDireta.c_str(), evento, tagsNoCurral.size());
+      }
+    }
   }
 }
