@@ -12,6 +12,9 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * REST endpoints for listing open RFID identification pendencies and resolving them via {@code POST} or {@code PUT}.
+ */
 @RestController
 @RequestMapping("/api/v1")
 @RequiredArgsConstructor
@@ -29,6 +32,14 @@ public class PendencyController {
         return ResponseEntity.ok(list);
     }
 
+    /**
+     * Resolves an open identification pendency by associating it with a same-farm animal ({@code POST} alias).
+     *
+     * @param pendencyId open pendency identifier
+     * @param request    payload specifying the target animal identifier
+     * @param user       authenticated user principal
+     * @return HTTP {@code 200 OK} with the resolved pendency record
+     */
     @PostMapping("/pendencias/{pendencyId}/resolver")
     public ResponseEntity<IdentifyPendencyResponseDTO> resolvePendencyPost(
             @PathVariable Long pendencyId,
@@ -43,6 +54,14 @@ public class PendencyController {
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * Resolves an open identification pendency by associating it with a same-farm animal ({@code PUT} alias).
+     *
+     * @param pendencyId open pendency identifier
+     * @param request    payload specifying the target animal identifier
+     * @param user       authenticated user principal
+     * @return HTTP {@code 200 OK} with the resolved pendency record
+     */
     @PutMapping("/pendencias/{pendencyId}/resolver")
     public ResponseEntity<IdentifyPendencyResponseDTO> resolvePendencyPut(
             @PathVariable Long pendencyId,
