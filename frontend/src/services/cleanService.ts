@@ -1,14 +1,15 @@
 /**
- * src/services/cleanService.ts
- * Disparo e Histórico de Comandos de Limpeza com Travas Biológicas e de Conectividade.
+ * Service for triggering wash commands, issuing emergency stops, and reading wash history.
  */
 
 import { apiClient } from './apiClient';
 import type { CleanCmdRequestDTO, CleanCmdResponseDTO } from '../types/api';
 
 /**
- * Aciona a bomba de limpeza do curral (submetido às 3 travas de segurança: animal presente, bomba ativa, conectividade).
- * Endpoint: POST /api/v1/currais/{corralId}/limpeza
+ * Dispatches a wash command and awaits hardware ACK; fails with 409 Conflict if any biological,
+ * concurrency, or device-liveness lock rejects execution.
+ *
+ * @endpoint POST /api/v1/currais/{corralId}/limpeza
  */
 export async function triggerCleaning(
   corralId: number,
@@ -22,8 +23,21 @@ export async function triggerCleaning(
 }
 
 /**
- * Consulta o histórico de acionamentos de limpeza do curral.
- * Endpoint: GET /api/v1/currais/{corralId}/limpezas
+ * Clears active command locks and sends an immediate pump shutoff command to the ESP32.
+ *
+ * @endpoint POST /api/v1/currais/{corralId}/limpeza/parar
+ */
+export async function stopCleaning(corralId: number): Promise<CleanCmdResponseDTO> {
+  const safeCorralId = encodeURIComponent(String(corralId));
+  return apiClient<CleanCmdResponseDTO>(`/currais/${safeCorralId}/limpeza/parar`, {
+    method: 'POST',
+  });
+}
+
+/**
+ * Lists corral cleaning commands ordered newest-first.
+ *
+ * @endpoint GET /api/v1/currais/{corralId}/limpezas
  */
 export async function listCleanHistory(corralId: number): Promise<CleanCmdResponseDTO[]> {
   const safeCorralId = encodeURIComponent(String(corralId));
@@ -34,6 +48,7 @@ export async function listCleanHistory(corralId: number): Promise<CleanCmdRespon
 
 export const cleanService = {
   triggerCleaning,
+  stopCleaning,
   listCleanHistory,
 };
 

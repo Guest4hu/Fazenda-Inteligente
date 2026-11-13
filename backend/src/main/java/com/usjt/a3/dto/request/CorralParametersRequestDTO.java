@@ -6,6 +6,13 @@ import jakarta.validation.constraints.PositiveOrZero;
 
 import java.time.LocalTime;
 
+/**
+ * Request payload for updating corral automation schedule, gas trigger limit, and 1-60s pump duration.
+ *
+ * @param cleanTime           daily automatic wash time, or {@code null} to disable time-based scheduling
+ * @param limitOdor           gas trigger threshold ({@code >= 0})
+ * @param pumpDurationSeconds pump cycle duration in seconds ({@code 1..60})
+ */
 public record CorralParametersRequestDTO(
 
         LocalTime cleanTime,

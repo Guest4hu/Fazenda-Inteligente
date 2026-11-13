@@ -8,12 +8,21 @@ import com.usjt.a3.mqtt.dto.ParsedRequestDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+/**
+ * Parses incoming MQTT topic paths structured as {@code <prefix>/<mac>/<suffix>} into {@link ParsedRequestDTO}.
+ */
 @Component
 @RequiredArgsConstructor
 public class MqttTopics {
 
     private final MqttProperties properties;
 
+    /**
+     * Extracts and uppercases the device MAC segment and matches the trailing suffix against {@link EntryTopics}.
+     *
+     * @param topico full MQTT topic received from the broker
+     * @return parsed device MAC and topic enum, or empty if malformed or unrecognized
+     */
     public Optional<ParsedRequestDTO> interpretar(String topico) {
         String inicio = properties.topicPrefix() + "/";
         if (topico == null || !topico.startsWith(inicio)) {
@@ -27,7 +36,7 @@ public class MqttTopics {
         }
 
         String mac = resto.substring(0, barra).toUpperCase();
-        String sufixo = resto.substring(barra + 1);          // "odor/nivel"
+        String sufixo = resto.substring(barra + 1);
 
         return EntryTopics.deSufixo(sufixo)
                 .map(type -> new ParsedRequestDTO(mac, type));

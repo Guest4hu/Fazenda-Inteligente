@@ -15,6 +15,10 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * REST endpoints for farm herd CRUD, manual/RFID corral presence registration, and presence event timelines,
+ * exposing both flat ({@code /currais/{corralId}/...}, {@code /animais/{animalId}}) and farm-nested aliases.
+ */
 @RestController
 @RequestMapping("/api/v1")
 @RequiredArgsConstructor
@@ -22,7 +26,6 @@ public class AnimalController {
 
     private final AnimalService animalService;
 
-    // 1. Cadastrar animal na fazenda
     @PostMapping("/farms/{farmId}/animais")
     public ResponseEntity<AnimalResponseDTO> createAnimal(
             @PathVariable Long farmId,
@@ -33,7 +36,6 @@ public class AnimalController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    // 2. Listar animais da fazenda
     @GetMapping("/farms/{farmId}/animais")
     public ResponseEntity<List<AnimalResponseDTO>> listAnimals(
             @PathVariable Long farmId,
@@ -43,7 +45,15 @@ public class AnimalController {
         return ResponseEntity.ok(list);
     }
 
-    // 3. Registrar movimentação de presença RFID (Entrou / Saiu do curral)
+    /**
+     * Records a manual or simulated RFID presence event ({@code ENTROU}/{@code SAIU}) for a corral.
+     *
+     * @param corralId target corral identifier
+     * @param farmId   optional farm identifier for containment validation when called via nested farm route
+     * @param request  presence event payload containing RFID tag UID, movement direction, and origin
+     * @param user     authenticated user principal
+     * @return HTTP {@code 201 Created} containing the persisted animal movement event
+     */
     @PostMapping({"/currais/{corralId}/presenca", "/farms/{farmId}/currais/{corralId}/presenca"})
     public ResponseEntity<AnimalEventResponseDTO> registerPresence(
             @PathVariable Long corralId,
@@ -55,7 +65,6 @@ public class AnimalController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    // 4. Linha do tempo de presenças do curral
     @GetMapping({"/currais/{corralId}/eventos", "/farms/{farmId}/currais/{corralId}/eventos"})
     public ResponseEntity<List<AnimalEventResponseDTO>> listEvents(
             @PathVariable Long corralId,
@@ -66,7 +75,6 @@ public class AnimalController {
         return ResponseEntity.ok(list);
     }
 
-    // 5. Atualizar animal
     @PutMapping({"/animais/{animalId}", "/farms/{farmId}/animais/{animalId}"})
     public ResponseEntity<AnimalResponseDTO> updateAnimal(
             @PathVariable Long animalId,
@@ -78,7 +86,6 @@ public class AnimalController {
         return ResponseEntity.ok(response);
     }
 
-    // 6. Excluir animal
     @DeleteMapping({"/animais/{animalId}", "/farms/{farmId}/animais/{animalId}"})
     public ResponseEntity<Void> deleteAnimal(
             @PathVariable Long animalId,
@@ -89,7 +96,6 @@ public class AnimalController {
         return ResponseEntity.noContent().build();
     }
 
-    // 7. Buscar animal por ID
     @GetMapping({"/animais/{animalId}", "/farms/{farmId}/animais/{animalId}"})
     public ResponseEntity<AnimalResponseDTO> getAnimal(
             @PathVariable Long animalId,

@@ -1,6 +1,5 @@
 /**
- * src/services/corralService.ts
- * Gestão de Currais, Parâmetros Operacionais e Métricas de Telemetria/Ocupação.
+ * Service for corral CRUD, automation threshold updates, aggregated metrics, and SSE stream URLs.
  */
 
 import { apiClient, resolveUrl } from './apiClient';
@@ -13,8 +12,9 @@ import type {
 } from '../types/api';
 
 /**
- * Lista todos os currais vinculados a uma fazenda.
- * Endpoint: GET /api/v1/farms/{farmId}/currais
+ * Lists all corrals belonging to a farm.
+ *
+ * @endpoint GET /api/v1/farms/{farmId}/currais
  */
 export async function listCorrais(farmId: number): Promise<CorralResponseDTO[]> {
   const safeFarmId = encodeURIComponent(String(farmId));
@@ -24,8 +24,9 @@ export async function listCorrais(farmId: number): Promise<CorralResponseDTO[]> 
 }
 
 /**
- * Busca detalhes de um curral específico por ID (rota direta ou aninhada).
- * Endpoint: GET /api/v1/currais/{corralId} ou GET /api/v1/farms/{farmId}/currais/{corralId}
+ * Fetches corral details by ID using either the flat or farm-nested route.
+ *
+ * @endpoint GET /api/v1/currais/{corralId}
  */
 export async function getCorral(corralId: number, farmId?: number): Promise<CorralResponseDTO> {
   const safeCorralId = encodeURIComponent(String(corralId));
@@ -39,8 +40,9 @@ export async function getCorral(corralId: number, farmId?: number): Promise<Corr
 }
 
 /**
- * Cadastra um novo curral vinculado à fazenda informada com sanitização do MAC Address.
- * Endpoint: POST /api/v1/farms/{farmId}/currais
+ * Creates a corral under a farm after normalizing its 12-hex MAC address via {@link sanitizeMacAddress}.
+ *
+ * @endpoint POST /api/v1/farms/{farmId}/currais
  */
 export async function createCorral(farmId: number, data: CorralRequestDTO): Promise<CorralResponseDTO> {
   const safeFarmId = encodeURIComponent(String(farmId));
@@ -56,8 +58,9 @@ export async function createCorral(farmId: number, data: CorralRequestDTO): Prom
 }
 
 /**
- * Atualiza os dados cadastrais de um curral existente.
- * Endpoint: PUT /api/v1/currais/{corralId} ou PUT /api/v1/farms/{farmId}/currais/{corralId}
+ * Updates corral details and sanitized MAC address via flat or nested route.
+ *
+ * @endpoint PUT /api/v1/currais/{corralId}
  */
 export async function updateCorral(
   corralId: number,
@@ -81,9 +84,10 @@ export async function updateCorral(
 }
 
 /**
- * Atualiza os parâmetros operacionais (horário de limpeza, limite de odor, duração da bomba).
- * Nota: Enviar cleanTime como null desativa o agendamento diário.
- * Endpoint: PUT /api/v1/currais/{corralId}/parametros
+ * Updates operational automation thresholds ({@code cleanTime}, {@code limitOdor}, {@code pumpDurationSeconds}).
+ * Passing {@code cleanTime: null} disables the daily scheduled cleaning.
+ *
+ * @endpoint PUT /api/v1/currais/{corralId}/parametros
  */
 export async function updateParameters(
   corralId: number,
@@ -102,8 +106,9 @@ export async function updateParameters(
 }
 
 /**
- * Consulta métricas consolidadas do curral (lotação atual, limpezas hoje, conectividade, pendências).
- * Endpoint: GET /api/v1/currais/{corralId}/metricas
+ * Fetches aggregated corral KPI metrics (occupancy, today's washes, device liveness, open pendencies).
+ *
+ * @endpoint GET /api/v1/currais/{corralId}/metricas
  */
 export async function getMetrics(
   corralId: number,
@@ -120,8 +125,9 @@ export async function getMetrics(
 }
 
 /**
- * Exclui um curral (não permitido caso haja ciclo de limpeza em andamento).
- * Endpoint: DELETE /api/v1/currais/{corralId}
+ * Deletes a corral; rejected by the backend when a cleaning cycle is active or pending.
+ *
+ * @endpoint DELETE /api/v1/currais/{corralId}
  */
 export async function deleteCorral(corralId: number, farmId?: number): Promise<void> {
   const safeCorralId = encodeURIComponent(String(corralId));
@@ -135,11 +141,10 @@ export async function deleteCorral(corralId: number, farmId?: number): Promise<v
 }
 
 /**
- * Constrói a URL para a conexão SSE de streaming de eventos em tempo real do curral.
- * Endpoints suportados no backend:
- * - GET /api/v1/currais/{corralId}/stream
- * - GET /api/v1/farms/{farmId}/currais/{corralId}/stream
- * Suporta passagem de token via query parameter (?token=...) para compatibilidade nativa com EventSource do browser.
+ * Builds the Server-Sent Events stream URL for a corral, appending {@code ?token=} for browser
+ * {@code EventSource} compatibility because native {@code EventSource} cannot send Authorization headers.
+ *
+ * @endpoint GET /api/v1/currais/{corralId}/stream
  */
 export function getCorralStreamUrl(
   corralId: number,

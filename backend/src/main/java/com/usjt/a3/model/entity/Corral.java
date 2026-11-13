@@ -8,6 +8,12 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
+/**
+ * Monitored corral facility bound to a unique 12-character uppercase hexadecimal ESP32 MAC address.
+ *
+ * <p>Stores automation thresholds ({@code cleanTime}, {@code limitOdor}, {@code pumpDurationSeconds})
+ * alongside MQTT connectivity state and the latest {@code lastSeenAt} heartbeat timestamp.</p>
+ */
 @Entity
 @Table(name = "corral")
 @Getter

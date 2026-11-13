@@ -12,6 +12,9 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 
+/**
+ * Issues and verifies HMAC-SHA256 JWT access tokens with a 24-hour expiration window.
+ */
 @Service
 public class TokenService {
 
@@ -21,6 +24,12 @@ public class TokenService {
     @Value("${api.security.token.issuer}")
     private String issuer;
 
+    /**
+     * Generates a signed JWT embedding {@code userId}, {@code userName}, and the user's email as {@code sub}.
+     *
+     * @param user authenticated user entity
+     * @return signed compact JWT string
+     */
     public String generateToken(User user) {
         try {
             Algorithm algorithm = Algorithm.HMAC256(secret);
@@ -36,6 +45,12 @@ public class TokenService {
         }
     }
 
+    /**
+     * Verifies token signature, issuer, and expiration, returning the subject email or {@code null} if invalid.
+     *
+     * @param token compact JWT string
+     * @return token subject (user email), or {@code null} when verification fails
+     */
     public String validateToken(String token) {
         try {
             Algorithm algorithm = Algorithm.HMAC256(secret);
@@ -49,6 +64,12 @@ public class TokenService {
         }
     }
 
+    /**
+     * Verifies the JWT and reconstructs the {@link UserPrincipal} from its claims.
+     *
+     * @param token compact JWT string
+     * @return extracted principal, or {@code null} if the token is invalid or expired
+     */
     public UserPrincipal getUserByToken(String token) {
         try {
             Algorithm algorithm = Algorithm.HMAC256(secret);

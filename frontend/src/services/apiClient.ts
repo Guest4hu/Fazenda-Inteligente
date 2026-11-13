@@ -1,13 +1,12 @@
 /**
- * src/services/apiClient.ts
- * Cliente HTTP centralizado com injeção de autenticação Bearer,
- * suporte a RFC 7807 (ProblemDetail) e classe de erro tipada ApiError.
+ * Centralized fetch HTTP client handling JWT Bearer injection, cross-tab token synchronization,
+ * RFC 7807 ProblemDetail error normalization, and 401 unauthorized callbacks.
  */
 
 import type { ProblemDetail, InvalidParam, AuthUser } from '../types/api';
 
 // ============================================================================
-// CONSTANTES E CHAVES DE ARMAZENAMENTO
+// CONSTANTS & STORAGE KEYS
 // ============================================================================
 
 export const TOKEN_STORAGE_KEY = 'curral_auth_token';
@@ -16,14 +15,14 @@ const FALLBACK_TOKEN_KEYS = ['auth_token', 'token'];
 const FALLBACK_USER_KEYS = ['auth_user', 'user'];
 const DEFAULT_BASE_URL = '/api/v1';
 
-// Estado em memória para acesso síncrono rápido
 let inMemoryToken: string | null = null;
 let unauthorizedHandler: (() => void) | null = null;
 
 // ============================================================================
-// CLASSE DE ERRO RFC 7807: ApiError
+// RFC 7807 ERROR CLASS: ApiError
 // ============================================================================
 
+/** Typed error wrapping RFC 7807 {@link ProblemDetail} responses from the Spring Boot backend. */
 export class ApiError extends Error {
   public readonly status: number;
   public readonly title: string;
@@ -47,7 +46,6 @@ export class ApiError extends Error {
     this.problem = problem;
     this.problemDetail = problem;
 
-    // Garante a integridade da cadeia de protótipos para checagens com instanceof
     Object.setPrototypeOf(this, ApiError.prototype);
   }
 
@@ -93,9 +91,10 @@ export class ApiError extends Error {
 }
 
 // ============================================================================
-// GERENCIAMENTO DE TOKEN E SESSÃO
+// TOKEN & SESSION MANAGEMENT
 // ============================================================================
 
+/** Reads the JWT from in-memory cache first, falling back to primary and legacy localStorage keys. */
 export function getToken(): string | null {
   if (inMemoryToken) {
     return inMemoryToken;
@@ -167,12 +166,13 @@ export function clearAuth(): void {
   setStoredUser(null);
 }
 
+/** Registers a global callback invoked whenever an HTTP response returns {@code 401 Unauthorized}. */
 export function setOnUnauthorized(callback: (() => void) | null): void {
   unauthorizedHandler = callback;
 }
 
 // ============================================================================
-// DECODIFICAÇÃO E VALIDAÇÃO DE JWT
+// JWT DECODING & EXPIRATION VALIDATION
 // ============================================================================
 
 export interface JwtClaims {
@@ -184,6 +184,7 @@ export interface JwtClaims {
   iat?: number;
 }
 
+/** Decodes a Base64URL-encoded JWT payload without verifying the signature client-side. */
 export function parseJwt(token: string): JwtClaims | null {
   try {
     const parts = token.split('.');
@@ -202,13 +203,14 @@ export function parseJwt(token: string): JwtClaims | null {
   }
 }
 
+/** Checks JWT expiration applying a 10-second clock-skew safety buffer. */
 export function isTokenExpired(token: string): boolean {
   const claims = parseJwt(token);
   if (!claims || !claims.exp) return false;
   return claims.exp * 1000 < Date.now() + 10000;
 }
 
-// Sincronização entre abas
+// Syncs cached in-memory JWT across browser tabs via StorageEvent
 if (typeof window !== 'undefined') {
   window.addEventListener('storage', (event) => {
     if (
@@ -222,7 +224,7 @@ if (typeof window !== 'undefined') {
 }
 
 // ============================================================================
-// UTILITÁRIOS DE URL E REQUISIÇÃO
+// URL RESOLUTION & HEALTH CHECK
 // ============================================================================
 
 export function getBaseUrl(): string {
@@ -232,6 +234,7 @@ export function getBaseUrl(): string {
   return DEFAULT_BASE_URL;
 }
 
+/** Resolves relative API paths against {@code VITE_API_BASE_URL} (default {@code /api/v1}) without duplicating prefixes. */
 export function resolveUrl(endpoint: string): string {
   if (endpoint.startsWith('http://') || endpoint.startsWith('https://')) {
     return endpoint;
@@ -254,8 +257,7 @@ export interface ApiRequestOptions extends Omit<RequestInit, 'body'> {
 }
 
 /**
- * Verifica se o servidor backend Spring Boot está respondendo na rede.
- * Retorna true se responder 200, 401 ou 403 (API viva).
+ * Probes backend availability by issuing {@code GET /farms}; treats HTTP 200, 401, or 403 as reachable.
  */
 export async function checkBackendHealth(): Promise<boolean> {
   try {
@@ -271,15 +273,19 @@ export async function checkBackendHealth(): Promise<boolean> {
 }
 
 // ============================================================================
-// CLIENTE HTTP PRINCIPAL
+// CORE HTTP CLIENT
 // ============================================================================
 
+/**
+ * Executes an HTTP request against the backend API, injecting the Bearer JWT unless {@code skipAuth}
+ * is true, parsing RFC 7807 {@code ProblemDetail} errors into {@link ApiError}, invoking the
+ * {@code 401} handler, and safely handling empty {@code 204} or non-JSON responses.
+ */
 export async function apiClient<T>(endpoint: string, options: ApiRequestOptions = {}): Promise<T> {
   const { body, params, skipAuth, headers: customHeaders, ...fetchInit } = options;
 
   let url = resolveUrl(endpoint);
 
-  // Adicionar query parameters caso informados
   if (params) {
     const searchParams = new URLSearchParams();
     Object.entries(params).forEach(([key, val]) => {
@@ -293,7 +299,6 @@ export async function apiClient<T>(endpoint: string, options: ApiRequestOptions 
     }
   }
 
-  // Normalizar cabeçalhos em objeto chave-valor
   const requestHeaders: Record<string, string> = {};
 
   if (customHeaders) {
@@ -310,7 +315,6 @@ export async function apiClient<T>(endpoint: string, options: ApiRequestOptions 
     }
   }
 
-  // Injetar token de autenticação caso não seja explicitamente ignorado
   if (!skipAuth) {
     const hasAuth = Object.keys(requestHeaders).some(
       (k) => k.toLowerCase() === 'authorization'
@@ -323,7 +327,6 @@ export async function apiClient<T>(endpoint: string, options: ApiRequestOptions 
     }
   }
 
-  // Serialização do corpo da requisição
   let bodyContent: BodyInit | undefined = undefined;
   if (body !== undefined && body !== null) {
     if (
@@ -359,7 +362,6 @@ export async function apiClient<T>(endpoint: string, options: ApiRequestOptions 
     body: bodyContent,
   });
 
-  // Tratamento de falhas HTTP (4xx / 5xx)
   if (!response.ok) {
     let problemDetail: ProblemDetail;
 
@@ -396,7 +398,6 @@ export async function apiClient<T>(endpoint: string, options: ApiRequestOptions 
       };
     }
 
-    // Se receber 401 e houver callback registrado, aciona callback
     if (response.status === 401 && unauthorizedHandler) {
       unauthorizedHandler();
     }
@@ -404,7 +405,6 @@ export async function apiClient<T>(endpoint: string, options: ApiRequestOptions 
     throw new ApiError(problemDetail);
   }
 
-  // Tratamento de status 204 No Content
   if (response.status === 204) {
     return null as unknown as T;
   }

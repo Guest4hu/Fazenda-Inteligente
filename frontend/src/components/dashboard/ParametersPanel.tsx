@@ -24,6 +24,11 @@ export interface ParametersPanelProps {
   isLive?: boolean;
 }
 
+/**
+ * Corral automation and odor-threshold configuration panel supporting manual
+ * vs. automatic schedule mode, {@code HH:MM} validation, 1-60s pump duration
+ * bounds, and live {@code PUT /parametros} persistence with simulated fallback.
+ */
 export const ParametersPanel: React.FC<ParametersPanelProps> = ({
   corralId,
   corral,
@@ -94,11 +99,15 @@ export const ParametersPanel: React.FC<ParametersPanelProps> = ({
     }
   };
 
+  /**
+   * Validates {@code HH:MM} schedule formatting and persists corral parameters,
+   * omitting {@code cleanTime} as {@code null} when switching to manual mode.
+   */
   const handleSave = async () => {
     setFieldErrors({});
     setGeneralError(null);
 
-    // Validação de formato HH:MM
+    // Validate HH:MM schedule format
     if (mode === 'automatico' && !/^\d{2}:\d{2}$/.test(timeInput)) {
       setFieldErrors({ cleanTime: 'Horário inválido. Use o formato HH:MM.' });
       if (onLogEvent) onLogEvent('Horário inválido. Use o formato HH:MM.', 'danger');
@@ -110,7 +119,7 @@ export const ParametersPanel: React.FC<ParametersPanelProps> = ({
       return;
     }
 
-    // Modo simulado / fallback
+    // Simulated / fallback mode
     if (!isLive || isSimulated || !corralId) {
       if (onSaveTime) {
         onSaveTime();
@@ -123,7 +132,7 @@ export const ParametersPanel: React.FC<ParametersPanelProps> = ({
       return;
     }
 
-    // Modo online conectado: PUT /currais/{corralId}/parametros
+    // Connected online mode: PUT /currais/{corralId}/parametros
     setIsSubmitting(true);
     try {
       const payload: CorralParametersRequestDTO = {
@@ -171,7 +180,7 @@ export const ParametersPanel: React.FC<ParametersPanelProps> = ({
         </span>
       </div>
 
-      {/* Seletor de Modo Operacional (Manual vs Automático) */}
+      {/* Operational mode selector (manual vs. scheduled automatic) */}
       <div>
         <label className="block text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wider">
           Modo de Operação
@@ -204,7 +213,6 @@ export const ParametersPanel: React.FC<ParametersPanelProps> = ({
         </div>
       </div>
 
-      {/* Horário Diário de Limpeza */}
       <div>
         <label htmlFor="hora" className="block text-sm font-semibold">
           Horário diário de limpeza {mode === 'manual' && <span className="text-xs text-muted-foreground font-normal">(desativado no modo manual)</span>}
@@ -236,7 +244,6 @@ export const ParametersPanel: React.FC<ParametersPanelProps> = ({
         )}
       </div>
 
-      {/* Feedback de Sucesso */}
       <p role="status" className="h-5 text-sm font-semibold text-primary flex items-center gap-1">
         {saved && (
           <span className="pop flex items-center gap-1">
@@ -245,7 +252,7 @@ export const ParametersPanel: React.FC<ParametersPanelProps> = ({
         )}
       </p>
 
-      {/* Campos de Parâmetros Operacionais (Limiar e Duração) */}
+      {/* Operational thresholds: MQ-135 gas limit and pump cycle duration */}
       <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border/60">
         <div>
           <label htmlFor="limitOdor" className="block text-xs font-semibold text-muted-foreground">

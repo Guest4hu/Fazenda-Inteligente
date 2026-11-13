@@ -7,6 +7,9 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 
+/**
+ * Immutable historical movement log entry recording an animal's entry or exit event at a corral.
+ */
 @Entity
 @Table(name = "animal_event")
 @Getter

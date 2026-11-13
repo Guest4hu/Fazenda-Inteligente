@@ -33,6 +33,10 @@ export interface AuthProviderProps {
   children: ReactNode;
 }
 
+/**
+ * React authentication context managing JWT state, 401 auto-logout registration,
+ * token expiration checks, and cross-tab localStorage session synchronization.
+ */
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [token, setTokenState] = useState<string | null>(() => authService.getToken());
   const [user, setUserState] = useState<AuthUser | null>(() => authService.getUser());
@@ -41,6 +45,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const clearError = useCallback(() => setError(null), []);
 
+  /** Clears client auth state and persisted farm/corral selections. */
   const logout = useCallback(() => {
     authService.logout();
     setTokenState(null);
@@ -98,7 +103,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, []);
 
-  // Inicialização, verificação de expiração e registro de interceptor 401
+  // Initialize auth state from storage, check expiry, register 401 handler, and sync tabs
   useEffect(() => {
     const existingToken = authService.getToken();
     if (existingToken) {
@@ -127,12 +132,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
     setIsLoading(false);
 
-    // Registra logout automático em respostas 401
+    // Trigger automatic client logout on HTTP 401 responses
     setOnUnauthorized(() => {
       logout();
     });
 
-    // Sincronização de logout e login entre abas
+    // Synchronize login/logout across browser tabs
     const handleStorageEvent = (e: StorageEvent) => {
       if (e.key === TOKEN_STORAGE_KEY) {
         if (!e.newValue) {
@@ -171,6 +176,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
+/** Hook to access {@link AuthContextType}; throws if called outside {@link AuthProvider}. */
 export function useAuth(): AuthContextType {
   const context = useContext(AuthContext);
   if (!context) {

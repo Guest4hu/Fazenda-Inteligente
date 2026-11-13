@@ -9,6 +9,9 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+/**
+ * Inbound MQTT handler for {@link EntryTopics#STATUS} controller connect/disconnect and Last-Will messages.
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -22,6 +25,13 @@ public class CommandStatusReceive implements CommandReceiveMqtt {
         return EntryTopics.STATUS;
     }
 
+    /**
+     * Reads {@code status} from JSON and delegates to {@link CorralService#updateDeviceStatus};
+     * any value other than {@code ONLINE} is treated as {@link DeviceStatus#OFFLINE}.
+     *
+     * @param macAddress normalized controller MAC address extracted from the topic
+     * @param payload raw JSON status payload
+     */
     @Override
     public void tratar(String macAddress, String payload) {
         if (macAddress == null || macAddress.isBlank() || payload == null || payload.isBlank()) {

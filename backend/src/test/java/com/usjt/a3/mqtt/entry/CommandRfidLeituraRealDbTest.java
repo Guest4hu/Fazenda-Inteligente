@@ -45,12 +45,13 @@ class CommandRfidLeituraRealDbTest {
     @Autowired
     private CleanService cleanService;
 
-    private static final String MAC_CURRAL_1 = "240AC4000110";
     private static final String TAG_VACA_MIMOSA = "E2801160";
+    private String macCurral1;
 
     @org.junit.jupiter.api.BeforeEach
     void setUp() {
         Corral corral = corralRepository.findById(1L).orElseThrow();
+        macCurral1 = corral.getMacAddress();
         animalRepository.findByTagUid(TAG_VACA_MIMOSA).orElseGet(() -> {
             Animal novo = new Animal();
             novo.setName("Vaca Mimosa");
@@ -65,7 +66,7 @@ class CommandRfidLeituraRealDbTest {
     @Order(1)
     @DisplayName("Processa saída de vaca via RFID, limpando current_corral_id no PostgreSQL e gravando AnimalEvent")
     void testarRfidLeituraSaiuAtualizaBancoEDestravaLimpeza() {
-        Corral corralInicial = corralRepository.findByMacAddress(MAC_CURRAL_1).orElseThrow();
+        Corral corralInicial = corralRepository.findByMacAddress(macCurral1).orElseThrow();
         Animal animalInicial = animalRepository.findByTagUid(TAG_VACA_MIMOSA).orElseThrow();
         animalInicial.setCurrentCorral(corralInicial);
         animalRepository.save(animalInicial);
@@ -77,7 +78,7 @@ class CommandRfidLeituraRealDbTest {
                 }
                 """.formatted(TAG_VACA_MIMOSA);
 
-        assertDoesNotThrow(() -> commandRfidLeitura.tratar(MAC_CURRAL_1, payloadSaiu));
+        assertDoesNotThrow(() -> commandRfidLeitura.tratar(macCurral1, payloadSaiu));
 
         Animal animal = animalRepository.findByTagUid(TAG_VACA_MIMOSA).orElseThrow();
         assertNull(animal.getCurrentCorral(), "O animal deve estar fora do curral (currentCorral == null)");
@@ -103,7 +104,7 @@ class CommandRfidLeituraRealDbTest {
                 }
                 """.formatted(TAG_VACA_MIMOSA);
 
-        String macComDoisPontos = "24:0A:C4:00:01:10";
+        String macComDoisPontos = macCurral1.replaceAll("..(?!$)", "$0:");
         assertDoesNotThrow(() -> commandRfidLeitura.tratar(macComDoisPontos, payloadEntrou));
 
         Animal animal = animalRepository.findByTagUid(TAG_VACA_MIMOSA).orElseThrow();
@@ -129,7 +130,7 @@ class CommandRfidLeituraRealDbTest {
                 }
                 """;
 
-        assertDoesNotThrow(() -> commandRfidLeitura.tratar(MAC_CURRAL_1, payload));
+        assertDoesNotThrow(() -> commandRfidLeitura.tratar(macCurral1, payload));
 
         var pendencias = identifyPendencyRepository.findByCorralIdAndResolvedFalseOrderByInstantDesc(1L);
         assertFalse(pendencias.isEmpty(), "Deve existir pendência de identificação criada no banco");

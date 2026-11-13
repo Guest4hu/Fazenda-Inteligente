@@ -13,6 +13,11 @@ export interface FarmModalProps {
   farmToEdit?: FarmResponseDTO | null;
 }
 
+/**
+ * Modal dialog for creating or editing a farm, supporting standalone rendering
+ * outside {@code FarmCorralContext} and mapping RFC 7807 validation/conflict
+ * responses onto form fields.
+ */
 export const FarmModal: React.FC<FarmModalProps> = ({
   isOpen,
   onClose,

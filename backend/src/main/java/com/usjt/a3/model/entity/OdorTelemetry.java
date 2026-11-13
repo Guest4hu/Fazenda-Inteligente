@@ -7,6 +7,9 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 
+/**
+ * Time-series gas sensor reading from a corral's MQ-135 ADC channel with optional DHT temperature and humidity.
+ */
 @Entity
 @Table(name = "odor_telemetry")
 @Getter
@@ -27,6 +30,12 @@ public class OdorTelemetry {
     @PositiveOrZero
     @Max(10000)
     private Integer value;
+
+    @Column(name = "temperature", nullable = true)
+    private Double temperature;
+
+    @Column(name = "humidity", nullable = true)
+    private Double humidity;
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime instant;

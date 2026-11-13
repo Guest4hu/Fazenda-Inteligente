@@ -14,6 +14,10 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.List;
 
+/**
+ * Per-request servlet filter that authenticates requests carrying a valid JWT token
+ * and populates Spring's {@link SecurityContextHolder} with {@link UserPrincipal}.
+ */
 @Component
 @RequiredArgsConstructor
 public class SecurityFilter extends OncePerRequestFilter {
@@ -40,6 +44,11 @@ public class SecurityFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
+    /**
+     * Extracts the raw JWT from the {@code Authorization: Bearer <token>} header, falling back
+     * to the {@code ?token=} query parameter required by browser {@code EventSource} SSE connections
+     * that cannot send custom headers.
+     */
     private String recoverToken(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {

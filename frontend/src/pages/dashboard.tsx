@@ -1,10 +1,12 @@
+/**
+ * Main smart-corral operational dashboard supporting both live Spring Boot REST + SSE telemetry
+ * and a local interactive simulation mode when unauthenticated or when no corral is selected.
+ */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
-// Contextos
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { FarmCorralProvider, useFarmCorral } from '../context/FarmCorralContext';
 
-// Serviços da API REST
 import { animalService } from '../services/animalService';
 import { corralService } from '../services/corralService';
 import { odorService } from '../services/odorService';
@@ -14,7 +16,6 @@ import { checkBackendHealth, getToken } from '../services/apiClient';
 import { subscribeToCorralStream } from '../services/sseService';
 import { Info } from 'lucide-react';
 
-// Tipos da API
 import type {
   CorralMetricsResponseDTO,
   AnimalResponseDTO,
@@ -24,7 +25,6 @@ import type {
   CleanCmdResponseDTO,
 } from '../types/api';
 
-// Subcomponentes Modulares do Dashboard
 import { Header } from '../components/dashboard/Header';
 import { ConnectivityBanner } from '../components/dashboard/ConnectivityBanner';
 import { CleaningControl } from '../components/dashboard/CleaningControl';
@@ -41,6 +41,7 @@ const dateKey = (d: Date) =>
 const rnd = (a: number, b: number) => +(a + Math.random() * (b - a)).toFixed(1);
 const WASH_SECONDS = 20;
 
+/** Core stateful dashboard orchestrating live SSE updates, adaptive polling, safety stops, and simulation fallback. */
 function DashboardContent() {
   const { isAuthenticated, user, logout } = useAuth();
   const {
@@ -54,9 +55,7 @@ function DashboardContent() {
     updateCorralInContext,
   } = useFarmCorral();
 
-  // --------------------------------------------------------------------------
-  // 1. Estados de Dados Vivos (API)
-  // --------------------------------------------------------------------------
+  // Live API states
   const [metrics, setMetrics] = useState<CorralMetricsResponseDTO | null>(null);
   const [odorReadings, setOdorReadings] = useState<OdorTelemetryResponseDTO[]>([]);
   const [animals, setAnimals] = useState<AnimalResponseDTO[]>([]);
@@ -67,9 +66,7 @@ function DashboardContent() {
   const [isBackendOnline, setIsBackendOnline] = useState<boolean | null>(null);
   const [isSseConnected, setIsSseConnected] = useState<boolean>(false);
 
-  // --------------------------------------------------------------------------
-  // 2. Estados de Simulação / Fallback (Preserva compatibilidade total)
-  // --------------------------------------------------------------------------
+  // Simulation / fallback states for offline & unauthenticated demonstration
   const [mode, setMode] = useState<Mode>('manual');
   const [timeInput, setTimeInput] = useState('06:30');
   const [savedTime, setSavedTime] = useState('06:30');
@@ -82,11 +79,11 @@ function DashboardContent() {
     { id: 0, t: ts(), msg: 'Painel iniciado em modo simulado.', kind: 'info' },
   ]);
 
-  // Modais complementares
+  // Auxiliary modals
   const [showPendenciesModal, setShowPendenciesModal] = useState(false);
   const [openCreateOnPendencies, setOpenCreateOnPendencies] = useState(false);
 
-  // Refs de timers e estados síncronos
+  // Synchronous state refs for interval and SSE callbacks
   const idRef = useRef(1);
   const presenceRef = useRef(false);
   const washingRef = useRef(false);
@@ -104,7 +101,7 @@ function DashboardContent() {
   activeCorralRef.current = activeCorral;
 
   // --------------------------------------------------------------------------
-  // 3. Funções de Logging e Timers Simulados
+  // 3. Logging Helpers & Simulated Wash Timers
   // --------------------------------------------------------------------------
   const log = useCallback((msg: string, kind: Kind = 'info') => {
     setEvents((e) => [{ id: idRef.current++, t: ts(), msg, kind }, ...e].slice(0, 30));
@@ -125,7 +122,7 @@ function DashboardContent() {
     log(msg, kind);
   }, [log]);
 
-  const startWashSimulated = useCallback((origin: string) => {
+  const startWashSimulated = useCallback((origin: string, customDuration?: number) => {
     if (presenceRef.current) {
       log(`Lavagem (${origin}) RECUSADA: animal detectado no curral. Bomba simulada continua desligada.`, 'danger');
       return;
@@ -136,7 +133,7 @@ function DashboardContent() {
     }
     washingRef.current = true;
     setWashing(true);
-    let left = activeCorral?.pumpDurationSeconds || WASH_SECONDS;
+    let left = customDuration || activeCorral?.pumpDurationSeconds || WASH_SECONDS;
     setRemaining(left);
     log(`Lavagem simulada iniciada (${origin}). Bomba simulada LIGADA.`, 'ok');
     clearTimer();
@@ -171,7 +168,7 @@ function DashboardContent() {
     }
   };
 
-  // Agendamento automático simulado (quando em modo automático)
+  // Simulated daily schedule watcher when running in automatic demo mode
   useEffect(() => {
     const id = window.setInterval(() => {
       if (modeRef.current !== 'automatico') return;
@@ -189,9 +186,10 @@ function DashboardContent() {
     };
   }, [startWashSimulated]);
 
-  // --------------------------------------------------------------------------
-  // 4. Sincronização Sob Demanda e Periódica com API Backend
-  // --------------------------------------------------------------------------
+  /**
+   * Synchronizes metrics, odor readings, herd occupancy, timeline events, pendencies, and wash history
+   * in parallel, triggering an emergency biological stop if animal occupancy is detected during a wash.
+   */
   const syncDashboardData = useCallback(async (silent?: unknown) => {
     const isSilent = silent === true;
     setIsRefreshing(true);
@@ -215,7 +213,18 @@ function DashboardContent() {
         ]);
 
         if (metricsData) setMetrics(metricsData);
-        if (odorData) setOdorReadings(odorData);
+        if (odorData) {
+          setOdorReadings(odorData);
+          if (odorData.length > 0) {
+            const latest = odorData[0];
+            setSensors((prev) => ({
+              ...prev,
+              mq: latest.value,
+              temp: (latest.temperature != null && !isNaN(latest.temperature) && latest.temperature > 0) ? latest.temperature : prev.temp,
+              hum: (latest.humidity != null && !isNaN(latest.humidity) && latest.humidity > 0) ? latest.humidity : prev.hum,
+            }));
+          }
+        }
 
         if (animalsData) {
           const currentInCorral = animalsData.filter((a) => a.currentCorralId === selectedCorralId);
@@ -241,10 +250,13 @@ function DashboardContent() {
           prevCorralAnimalsRef.current = currentIds;
           animalsRef.current = animalsData;
 
-          // Parada biológica imediata caso a lavagem esteja em andamento e haja animal presente
+          // Immediate biological safety stop when an animal occupies the corral while washing
           const hasAnimalPresent =
             currentIds.length > 0 || ((metricsData?.totalAnimaisNoCurral ?? 0) > 0);
           if (hasAnimalPresent && washingRef.current) {
+            if (isLive && selectedCorralId) {
+              cleanService.stopCleaning(selectedCorralId).catch(() => {});
+            }
             endWash(
               'PARADA DE SEGURANÇA: animal detectado no curral pelo sensor/RFID. Bomba desligada.',
               'danger'
@@ -271,7 +283,7 @@ function DashboardContent() {
         }
       }
     } else {
-      // Fallback simulado
+      // Simulated telemetry fallback
       setSensors({
         temp: rnd(22, 36),
         hum: rnd(45, 85),
@@ -285,9 +297,7 @@ function DashboardContent() {
     setIsRefreshing(false);
   }, [isLive, selectedCorralId, selectedFarmId, log, endWash]);
 
-  // --------------------------------------------------------------------------
-  // 4.1 Conexão SSE em Tempo Real (Server-Sent Events)
-  // --------------------------------------------------------------------------
+  // Real-time Server-Sent Events (SSE) subscription for the selected corral
   useEffect(() => {
     if (!isLive || !selectedCorralId) {
       setIsSseConnected(false);
@@ -313,6 +323,12 @@ function DashboardContent() {
       onOdor: (data) => {
         setIsBackendOnline(true);
         setOdorReadings((prev) => [data, ...prev.filter((r) => r.id !== data.id)].slice(0, 50));
+        setSensors((prev) => ({
+          ...prev,
+          mq: data.value,
+          temp: (data.temperature != null && !isNaN(data.temperature) && data.temperature > 0) ? data.temperature : prev.temp,
+          hum: (data.humidity != null && !isNaN(data.humidity) && data.humidity > 0) ? data.humidity : prev.hum,
+        }));
         setMetrics((prev) =>
           prev
             ? {
@@ -349,8 +365,11 @@ function DashboardContent() {
         setIsBackendOnline(true);
         setLiveEvents((prev) => [data, ...prev.filter((e) => e.id !== data.id)].slice(0, 50));
 
-        // Parada de segurança biológica imediata caso a bomba d'água esteja ligada e o animal tenha entrado
+        // Immediate biological safety stop when an animal enters during an active wash
         if (data.typeEvent === 'ENTROU' && washingRef.current) {
+          if (isLive && selectedCorralId) {
+            cleanService.stopCleaning(selectedCorralId).catch(() => {});
+          }
           endWash(
             'PARADA DE SEGURANÇA: animal detectado no curral pelo sensor/RFID. Bomba desligada.',
             'danger'
@@ -400,6 +419,9 @@ function DashboardContent() {
           animalsRef.current = updatedList;
 
           if (currentIds.length > 0 && washingRef.current) {
+            if (isLive && selectedCorralId) {
+              cleanService.stopCleaning(selectedCorralId).catch(() => {});
+            }
             endWash(
               'PARADA DE SEGURANÇA: animal detectado no curral pelo sensor/RFID. Bomba desligada.',
               'danger'
@@ -569,26 +591,21 @@ function DashboardContent() {
     };
   }, [isLive, selectedCorralId, selectedFarmId, log, endWash, updateCorralInContext]);
 
-  // --------------------------------------------------------------------------
-  // 4.2 Polling Resiliente de Fallback e Sincronização Periódica
-  // --------------------------------------------------------------------------
+  // Adaptive polling: 15s reconciliation with active SSE, 3s rapid fallback when SSE disconnects
   useEffect(() => {
     if (isLive && selectedCorralId) {
       hasInitializedAnimalsRef.current = false;
       prevCorralAnimalsRef.current = [];
       syncDashboardData(false);
-      // Quando SSE está ativo, mantém sincronização periódica de reconciliação a cada 15s;
-      // Quando SSE desconecta ou falha, aciona imediatamente fallback para polling rápido de 3s.
       const pollIntervalMs = isSseConnected ? 15000 : 3000;
       const interval = setInterval(() => syncDashboardData(true), pollIntervalMs);
       return () => clearInterval(interval);
     }
   }, [isLive, selectedCorralId, isSseConnected, syncDashboardData]);
 
-  // Verificação periódica de conectividade com o Backend Spring Boot (executada apenas no navegador real)
+  // Periodic Spring Boot backend health check (browser runtime only; skipped under Vitest/Jest)
   useEffect(() => {
     let isMounted = true;
-    // Evita timers assíncronos não controlados durante a suíte de testes unitários
     const isTestEnv = typeof process !== 'undefined' && process.env?.NODE_ENV === 'test';
     if (isTestEnv) return;
 
@@ -609,12 +626,10 @@ function DashboardContent() {
     };
   }, []);
 
-  // Contagem de pendências não resolvidas
   const openPendenciesCount = pendencies.filter((p) => !p.resolved).length;
 
   return (
     <div className="min-h-[100dvh] pb-12 transition-colors">
-      {/* 1. Banner de Conectividade ESP32 (data-testid="banner-esp32") */}
       <ConnectivityBanner
         isLive={isLive}
         isSimulated={!isLive}
@@ -625,7 +640,6 @@ function DashboardContent() {
         isSseConnected={isSseConnected}
       />
 
-      {/* Dica Contextual Educativa para Modo Simulado */}
       {!isAuthenticated && (
         <div className="bg-amber-500/10 border-b border-amber-500/20 text-amber-950 px-4 py-2 text-xs flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-2">
@@ -641,7 +655,6 @@ function DashboardContent() {
         </div>
       )}
 
-      {/* 2. Cabeçalho Principal e Navegação Multi-Tenant */}
       <Header
         user={user}
         isAuthenticated={isAuthenticated}
@@ -658,7 +671,6 @@ function DashboardContent() {
       />
 
       <main className="max-w-5xl mx-auto px-4 mt-6 space-y-4">
-        {/* 3. Banner de Alerta para Pendências RFID Não Identificadas */}
         {isLive && openPendenciesCount > 0 && (
           <PendenciesAlertBanner
             pendenciesCount={openPendenciesCount}
@@ -677,9 +689,7 @@ function DashboardContent() {
           />
         )}
 
-        {/* 4. Grid Principal do Dashboard */}
         <div className="grid gap-4 md:grid-cols-6">
-          {/* 4.1 Controle de Limpeza (data-testid: status-pump, button-lavar, button-parar) */}
           <CleaningControl
             isLive={isLive}
             isSimulated={!isLive}
@@ -696,14 +706,13 @@ function DashboardContent() {
             deviceStatus={metrics?.deviceStatus || activeCorral?.deviceStatus || 'OFFLINE'}
             washingSimulated={washing}
             remainingSimulated={remaining}
-            onStartWashSimulated={() => startWashSimulated('manual')}
+            onStartWashSimulated={(duration) => startWashSimulated('manual', duration)}
             onStopWashSimulated={stopWashSimulated}
             cleanHistory={cleanHistory}
             onLogEvent={log}
             onRefresh={syncDashboardData}
           />
 
-          {/* 4.2 Lista de Presença de Animais (data-testid: status-presence, switch-presence) */}
           <AnimalPresenceList
             corralId={selectedCorralId}
             farmId={selectedFarmId}
@@ -718,7 +727,6 @@ function DashboardContent() {
             onStopWash={endWash}
           />
 
-          {/* 4.3 Painel de Parâmetros Operacionais (data-testid: mode-*, input-time, button-salvar-horario) */}
           <ParametersPanel
             isLive={isLive}
             isSimulated={!isLive}
@@ -749,7 +757,6 @@ function DashboardContent() {
             onRefresh={syncDashboardData}
           />
 
-          {/* 4.4 Cards de Sensores e Métricas (data-testid: value-temp, value-hum, value-mq, button-atualizar) */}
           <MetricsKpiCards
             isLive={isLive}
             isSimulated={!isLive}
@@ -761,7 +768,6 @@ function DashboardContent() {
             isRefreshing={isRefreshing}
           />
 
-          {/* 4.5 Gráfico de Telemetria de Odor (MQ-135) */}
           <OdorChart
             isLive={isLive}
             readings={odorReadings}
@@ -769,7 +775,6 @@ function DashboardContent() {
             simulatedMqValue={sensors.mq}
           />
 
-          {/* 4.6 Linha do Tempo e Eventos (data-testid: list-events) */}
           <EventsTimeline
             isLive={isLive}
             corralName={activeCorral?.name}
@@ -780,7 +785,6 @@ function DashboardContent() {
         </div>
       </main>
 
-      {/* 5. Modais de Diálogo */}
       {selectedCorralId && (
         <PendenciesModal
           isOpen={showPendenciesModal}
@@ -806,7 +810,8 @@ function DashboardContent() {
 }
 
 /**
- * Componente raiz do Dashboard com auto-envelopamento seguro dos Providers
+ * Root Dashboard component that self-wraps with {@link AuthProvider} and {@link FarmCorralProvider}
+ * when mounted standalone outside an existing provider tree.
  */
 export default function Dashboard() {
   let hasAuthContext = false;

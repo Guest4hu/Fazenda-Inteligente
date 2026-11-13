@@ -32,6 +32,10 @@ const FarmCorralContext = createContext<FarmCorralContextType | undefined>(undef
 export const FARM_STORAGE_KEY = 'curral_selected_farm_id';
 export const CORRAL_STORAGE_KEY = 'curral_selected_corral_id';
 
+/**
+ * Multi-tenant farm and corral selection context with localStorage persistence
+ * and cascading corral reloads when switching or deleting farms.
+ */
 export const FarmCorralProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { isAuthenticated } = useAuth();
   const [farms, setFarms] = useState<FarmResponseDTO[]>([]);
@@ -54,7 +58,7 @@ export const FarmCorralProvider: React.FC<{ children: ReactNode }> = ({ children
   const [isLoadingCurrais, setIsLoadingCurrais] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Carrega currais de uma fazenda
+  /** Reloads corrals for the target (or currently selected) farm and preserves valid corral selection. */
   const refreshCurrais = useCallback(async (targetFarmId?: number): Promise<CorralResponseDTO[]> => {
     const fid = targetFarmId ?? selectedFarmId;
     if (!fid) {
@@ -92,7 +96,7 @@ export const FarmCorralProvider: React.FC<{ children: ReactNode }> = ({ children
     }
   }, [selectedFarmId]);
 
-  // Carrega lista de fazendas
+  /** Reloads producer farms and cascades corral refresh for the active farm selection. */
   const refreshFarms = useCallback(async (): Promise<FarmResponseDTO[]> => {
     if (!isAuthenticated) {
       setFarms([]);
@@ -134,7 +138,7 @@ export const FarmCorralProvider: React.FC<{ children: ReactNode }> = ({ children
     }
   }, [isAuthenticated, selectedFarmId, refreshCurrais]);
 
-  // Seleção de Fazenda
+  /** Switches the active farm, updates storage, and reloads its corrals. */
   const selectFarm = useCallback(async (farmId: number | null) => {
     setSelectedFarmId(farmId);
     if (typeof window !== 'undefined' && window.localStorage) {
@@ -149,7 +153,7 @@ export const FarmCorralProvider: React.FC<{ children: ReactNode }> = ({ children
     }
   }, [refreshCurrais]);
 
-  // Seleção de Curral
+  /** Switches the active corral and persists its ID in localStorage. */
   const selectCorral = useCallback((corralId: number | null) => {
     setSelectedCorralId(corralId);
     if (typeof window !== 'undefined' && window.localStorage) {
@@ -288,6 +292,7 @@ export const FarmCorralProvider: React.FC<{ children: ReactNode }> = ({ children
   return <FarmCorralContext.Provider value={value}>{children}</FarmCorralContext.Provider>;
 };
 
+/** Hook to access {@link FarmCorralContextType}; throws if called outside {@link FarmCorralProvider}. */
 export function useFarmCorral(): FarmCorralContextType {
   const context = useContext(FarmCorralContext);
   if (!context) {

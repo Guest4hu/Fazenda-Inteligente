@@ -18,12 +18,21 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 
+/**
+ * REST and SSE endpoints for corral management, threshold parameter updates, operational KPI metrics,
+ * and live event streaming.
+ */
 @RestController
 @RequestMapping("/api/v1")
 public class CorralController {
     private final CorralService corralService;
     private final CorralSseService corralSseService;
 
+    /**
+     * Backward-compatible constructor omitting SSE streaming for isolated WebMvc test slices.
+     *
+     * @param corralService corral management service
+     */
     public CorralController(CorralService corralService) {
         this(corralService, null);
     }
@@ -80,6 +89,16 @@ public class CorralController {
         return ResponseEntity.noContent().build();
     }
 
+    /**
+     * Updates automation parameters ({@code cleanTime}, {@code limitOdor}, {@code pumpDurationSeconds})
+     * across either flat or farm-nested corral routes.
+     *
+     * @param corralId target corral identifier
+     * @param farmId   optional farm identifier for containment validation when using the nested farm route
+     * @param dto      updated automation parameters
+     * @param user     authenticated user principal
+     * @return HTTP {@code 200 OK} with the updated corral representation
+     */
     @PutMapping({"/currais/{corralId}/parametros", "/farms/{farmId}/currais/{corralId}/parametros"})
     public ResponseEntity<CorralResponseDTO> updateParameters(
             @PathVariable Long corralId,
@@ -90,6 +109,14 @@ public class CorralController {
         return ResponseEntity.ok(corralService.updateParameters(corralId, farmId, user.id(), dto));
     }
 
+    /**
+     * Returns aggregated presence counts, today's cleaning breakdown, open pendencies, and device status.
+     *
+     * @param corralId target corral identifier
+     * @param farmId   optional farm identifier for containment validation when using the nested farm route
+     * @param user     authenticated user principal
+     * @return HTTP {@code 200 OK} containing aggregated corral metrics
+     */
     @GetMapping({"/currais/{corralId}/metricas", "/farms/{farmId}/currais/{corralId}/metricas"})
     public ResponseEntity<CorralMetricsResponseDTO> getMetrics(
             @PathVariable Long corralId,
@@ -99,6 +126,15 @@ public class CorralController {
         return ResponseEntity.ok(corralService.getCorralMetrics(corralId, farmId, user.id()));
     }
 
+    /**
+     * Opens a {@code text/event-stream} Server-Sent Events channel pushing live corral updates
+     * ({@code odor}, {@code presenca}, {@code limpeza}, {@code status}, {@code pendencia}).
+     *
+     * @param corralId target corral identifier
+     * @param farmId   optional farm identifier for containment validation when using the nested farm route
+     * @param user     authenticated user principal
+     * @return registered SSE emitter streaming real-time corral events
+     */
     @GetMapping(
             value = {"/currais/{corralId}/stream", "/farms/{farmId}/currais/{corralId}/stream"},
             produces = MediaType.TEXT_EVENT_STREAM_VALUE

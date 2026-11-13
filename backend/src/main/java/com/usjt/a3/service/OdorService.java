@@ -17,6 +17,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Ingests MQ-135 odor ADC readings and optional DHT telemetry, updates device heartbeat state,
+ * streams updates over SSE, and triggers threshold-based automatic cleaning.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -29,7 +33,29 @@ public class OdorService {
     @Autowired(required = false)
     private CorralSseService corralSseService;
 
+    /**
+     * Processes legacy odor-only telemetry without ambient temperature or humidity fields.
+     *
+     * @param macAddress normalized device MAC address
+     * @param value raw ADC odor reading
+     */
     public void processTelemetry(String macAddress, Integer value) {
+        processTelemetry(macAddress, value, null, null);
+    }
+
+    /**
+     * Persists a valid odor telemetry sample, marks the corral {@link DeviceStatus#ONLINE} with a fresh
+     * {@code lastSeenAt} heartbeat, broadcasts an SSE {@code odor} event, and initiates a {@link CleanOrigin#EVENTO}
+     * wash if {@code value} meets or exceeds the corral's {@code limitOdor}.
+     *
+     * <p>Safety lock conflicts from {@link CleanService} (e.g., animal inside) are caught so telemetry persistence succeeds.</p>
+     *
+     * @param macAddress normalized device MAC address
+     * @param value raw ADC odor reading (must be non-null and non-negative)
+     * @param temperature optional ambient temperature in Celsius
+     * @param humidity optional relative humidity percentage
+     */
+    public void processTelemetry(String macAddress, Integer value, Double temperature, Double humidity) {
         if (value == null || value < 0) {
             log.warn("Telemetria de odor descartada: valor inválido para o curral {}", macAddress);
             return;
@@ -46,7 +72,7 @@ public class OdorService {
         corral.setLastSeenAt(LocalDateTime.now());
         corralRepository.save(corral);
 
-        var savedTelemetry = odorTelemetryRepository.save(odorTelemetryMapper.toEntity(corral, value));
+        var savedTelemetry = odorTelemetryRepository.save(odorTelemetryMapper.toEntity(corral, value, temperature, humidity));
         if (corralSseService != null && odorTelemetryMapper != null) {
             corralSseService.sendEvent(corral.getId(), "odor", odorTelemetryMapper.toDTO(savedTelemetry));
         }
@@ -62,6 +88,13 @@ public class OdorService {
         }
     }
 
+    /**
+     * Returns the 30 most recent odor telemetry samples for a corral owned by the requesting user.
+     *
+     * @param corralId target corral identifier
+     * @param userId authenticated owner identifier
+     * @return telemetry DTOs ordered newest-first
+     */
     public List<OdorTelemetryResponseDTO> listLatestTelemetries(Long corralId, Long userId) {
         if (!corralRepository.existsById(corralId)) {
             throw new EntityNotFoundException("Curral não encontrado com ID: " + corralId);

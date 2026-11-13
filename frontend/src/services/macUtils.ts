@@ -1,12 +1,12 @@
 /**
- * src/services/macUtils.ts
- * Normalização e validação de MAC Address para os currais e dispositivos ESP32.
+ * MAC address normalization and format validation utilities for ESP32 corral devices.
  */
 
 /**
- * Normalizes a MAC address string to exactly 12 uppercase hex characters.
- * Strips colons, hyphens, spaces, and dots.
- * Throws an Error if the resulting string is not a 12-digit hexadecimal.
+ * Normalizes a MAC address string to exactly 12 uppercase hexadecimal characters,
+ * stripping colons, hyphens, spaces, and dots.
+ *
+ * @throws Error when {@code mac} is missing or does not contain exactly 12 hex digits
  */
 export function sanitizeMacAddress(mac: string): string {
   if (!mac) {

@@ -13,6 +13,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+/**
+ * REST endpoint exposing the latest 30 gas and environmental telemetry samples for a corral.
+ */
 @RestController
 @RequestMapping("/api/v1/currais")
 @RequiredArgsConstructor

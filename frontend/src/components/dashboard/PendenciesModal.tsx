@@ -25,19 +25,16 @@ export interface PendenciesModalProps {
   isOpen: boolean;
   onClose: () => void;
   corralId: number | null;
-  /** Fazenda do curral selecionado. Necessária para cadastrar um novo animal a partir da tag. */
+  /** Parent farm of the selected corral, required to register a new animal from the tag. */
   farmId?: number | null;
   pendencies: IdentifyPendencyResponseDTO[];
   farmAnimals: AnimalResponseDTO[];
   onResolved: () => Promise<void> | void;
   onLogEvent?: LogFn;
-  /** Quando true, abre o modal já com o formulário de cadastro expandido na pendência mais recente. */
+  /** When true, opens the modal with the registration form expanded on the newest pendency. */
   openCreateOnFirst?: boolean;
 }
 
-// ============================================================================
-// Formulário inline: cadastra um novo animal com a tag desconhecida e resolve a pendência
-// ============================================================================
 interface CreateAnimalFromTagFormProps {
   farmId: number;
   pendency: IdentifyPendencyResponseDTO;
@@ -47,6 +44,10 @@ interface CreateAnimalFromTagFormProps {
   onLogEvent?: LogFn;
 }
 
+/**
+ * Inline two-step recovery form: creates a new animal bound to an unrecognized
+ * RFID tag and immediately resolves the open identification pendency.
+ */
 const CreateAnimalFromTagForm: React.FC<CreateAnimalFromTagFormProps> = ({
   farmId,
   pendency,
@@ -67,7 +68,7 @@ const CreateAnimalFromTagForm: React.FC<CreateAnimalFromTagFormProps> = ({
     setFormError(null);
     setFieldErrors({});
 
-    // Etapa 1: cadastrar o animal com a tag lida pelo ESP32
+    // Step 1: create the animal bound to the tag read by the ESP32
     let created: AnimalResponseDTO;
     try {
       created = await animalService.createAnimal(farmId, {
@@ -87,7 +88,7 @@ const CreateAnimalFromTagForm: React.FC<CreateAnimalFromTagFormProps> = ({
       return;
     }
 
-    // Etapa 2: resolver a pendência vinculando o animal recém-criado
+    // Step 2: resolve the identification pendency linking the newly created animal
     try {
       await pendencyService.resolvePendency(pendency.id, { animalId: created.id });
       await onCreatedAndResolved(created.name);
@@ -206,6 +207,10 @@ const CreateAnimalFromTagForm: React.FC<CreateAnimalFromTagFormProps> = ({
   );
 };
 
+/**
+ * Modal for resolving unknown RFID tag pendencies either by linking an
+ * existing animal or by running the inline create-and-resolve workflow.
+ */
 export const PendenciesModal: React.FC<PendenciesModalProps> = ({
   isOpen,
   onClose,
@@ -217,15 +222,15 @@ export const PendenciesModal: React.FC<PendenciesModalProps> = ({
   onLogEvent,
   openCreateOnFirst = false,
 }) => {
-  // Mapa de seleção pendencyId -> animalId
+  // Selection map: pendencyId -> animalId
   const [selectedAnimals, setSelectedAnimals] = useState<Record<number, number>>({});
   const [resolvingId, setResolvingId] = useState<number | null>(null);
   const [errorMap, setErrorMap] = useState<Record<number, string>>({});
   const [successId, setSuccessId] = useState<number | null>(null);
-  // Pendência cujo formulário de "cadastrar novo animal" está expandido
+  // Pendency ID whose inline "create new animal" form is expanded
   const [creatingForId, setCreatingForId] = useState<number | null>(null);
 
-  // Ao abrir pelo atalho "Cadastrar animal" do banner, expande o formulário da primeira pendência
+  // When opened via the banner's "Cadastrar animal" shortcut, expand the first pendency's creation form
   useEffect(() => {
     if (!isOpen) {
       setCreatingForId(null);
@@ -234,7 +239,7 @@ export const PendenciesModal: React.FC<PendenciesModalProps> = ({
     if (openCreateOnFirst && farmId && pendencies.length > 0) {
       setCreatingForId(pendencies[0].id);
     }
-    // Executa apenas na abertura do modal
+    // Run only when the modal opens or closes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
@@ -297,7 +302,6 @@ export const PendenciesModal: React.FC<PendenciesModalProps> = ({
       className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in"
     >
       <div className="w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl bg-card border border-border p-6 shadow-2xl relative">
-        {/* Botão de Fechamento */}
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-muted-foreground hover:text-foreground p-1 rounded-lg"
@@ -306,7 +310,6 @@ export const PendenciesModal: React.FC<PendenciesModalProps> = ({
           <X className="size-5" />
         </button>
 
-        {/* Título */}
         <div className="flex items-center gap-2.5 pb-2">
           <div className="p-2 rounded-xl bg-amber-500/15 text-amber-600">
             <Radio className="size-6" />
@@ -319,7 +322,7 @@ export const PendenciesModal: React.FC<PendenciesModalProps> = ({
           </div>
         </div>
 
-        {/* Corpo da Listagem */}
+        {/* Open pendency list */}
         <div className="mt-4 flex-1 overflow-y-auto space-y-3 pr-1">
           {pendencies.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground text-sm">
@@ -446,7 +449,6 @@ export const PendenciesModal: React.FC<PendenciesModalProps> = ({
           )}
         </div>
 
-        {/* Rodapé */}
         <div className="mt-4 pt-3 border-t border-border flex justify-end">
           <button
             onClick={onClose}
@@ -461,7 +463,8 @@ export const PendenciesModal: React.FC<PendenciesModalProps> = ({
 };
 
 /**
- * Banner de Alerta que é exibido no topo do dashboard quando há pendências em aberto
+ * Dashboard alert banner displayed when unresolved unknown RFID tag pendencies
+ * exist, providing direct access to modal resolution or quick animal creation.
  */
 export function PendenciesAlertBanner({
   pendenciesCount,
@@ -470,7 +473,7 @@ export function PendenciesAlertBanner({
 }: {
   pendenciesCount: number;
   onOpenModal: () => void;
-  /** Atalho: abre o modal já com o formulário de cadastro de animal para a tag desconhecida. */
+  /** Shortcut that opens the modal directly on the animal registration form for the unknown tag. */
   onAddAnimal?: () => void;
 }) {
   if (pendenciesCount <= 0) return null;

@@ -11,6 +11,10 @@ import tools.jackson.databind.ObjectMapper;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * MQTT implementation of {@link CommandPublisher} dispatching pump activation and emergency-stop JSON
+ * commands to {@code <prefix>/<MAC>/bomba/comando}.
+ */
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -21,29 +25,36 @@ public class CommandPublisherMqtt implements CommandPublisher {
     private final ObjectMapper objectMapper;
 
 
+    /**
+     * Serializes and publishes a pump start payload ({@code comandoId}, {@code duracao}, defaulting to 30s)
+     * to the controller's {@code bomba/comando} topic.
+     *
+     * @param macAddress target controller MAC address (normalized without {@code :} or {@code -})
+     * @param commandId correlation UUID later echoed in {@code bomba/ack}
+     * @param durationSeconds activation window in seconds
+     */
     @Override
     public void pumpAction(String macAddress, UUID commandId, Integer
             durationSeconds) {
-        // 1. Monta o tópico dinâmico: {prefixo}/{MAC}/bomba/comando
+        String cleanMac = macAddress != null ? macAddress.replace(":", "").replace("-", "").trim().toUpperCase() : "";
         String topic = String.format("%s/%s/bomba/comando",
                 mqttProperties.topicPrefix(),
-                macAddress.toUpperCase()
+                cleanMac
         );
 
-        // 2. Prepara os dados do payload
+        int safeDuration = durationSeconds != null ? durationSeconds : 30;
+
         Map<String, Object> payload = Map.of(
                 "comandoId", commandId.toString(),
-                "duracao", durationSeconds
+                "duracao", safeDuration
         );
 
         try {
-            // 3. Serializa para JSON
             String jsonPayload = objectMapper.writeValueAsString(payload);
 
             log.info("Publicando comando MQTT | Tópico: {} | Payload: {}", topic,
                     jsonPayload);
 
-            // 4. Envia para o Gateway do Spring Integration
             mqttGateway.sendToMqtt(jsonPayload, topic);
 
         } catch (Exception e) {
@@ -51,6 +62,37 @@ public class CommandPublisherMqtt implements CommandPublisher {
                     macAddress, e);
             throw new IllegalStateException("Falha ao serializar mensagem MQTT",
                     e);
+        }
+    }
+
+    /**
+     * Publishes an immediate pump shutoff payload ({@code comandoId}, {@code acao: "PARAR"}, {@code duracao: 0})
+     * to the controller's {@code bomba/comando} topic.
+     *
+     * @param macAddress target controller MAC address
+     * @param commandId correlation UUID for stop acknowledgment tracking
+     */
+    @Override
+    public void stopPump(String macAddress, UUID commandId) {
+        String cleanMac = macAddress != null ? macAddress.replace(":", "").replace("-", "").trim().toUpperCase() : "";
+        String topic = String.format("%s/%s/bomba/comando",
+                mqttProperties.topicPrefix(),
+                cleanMac
+        );
+
+        Map<String, Object> payload = Map.of(
+                "comandoId", commandId.toString(),
+                "acao", "PARAR",
+                "duracao", 0
+        );
+
+        try {
+            String jsonPayload = objectMapper.writeValueAsString(payload);
+            log.info("Publicando comando MQTT de parada | Tópico: {} | Payload: {}", topic, jsonPayload);
+            mqttGateway.sendToMqtt(jsonPayload, topic);
+        } catch (Exception e) {
+            log.error("Erro ao converter comando MQTT de parada em JSON para o curral {}", macAddress, e);
+            throw new IllegalStateException("Falha ao serializar mensagem MQTT de parada", e);
         }
     }
 }

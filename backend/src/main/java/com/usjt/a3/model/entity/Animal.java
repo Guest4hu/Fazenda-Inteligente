@@ -4,6 +4,10 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.Size;
 import lombok.*;
 
+/**
+ * Registered cattle entity holding the globally unique RFID {@code tagUid} and mutable
+ * {@code currentCorral} occupancy pointer (null when outside any corral).
+ */
 @Entity
 @Table(name = "animals")
 @Getter

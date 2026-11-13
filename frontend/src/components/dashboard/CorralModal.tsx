@@ -15,6 +15,11 @@ export interface CorralModalProps {
   corralToEdit?: CorralResponseDTO | null;
 }
 
+/**
+ * Modal dialog for creating or editing a corral, supporting standalone usage
+ * outside {@code FarmCorralContext}, client-side MAC/interval/odor validation,
+ * {@code HH:mm} to {@code HH:mm:ss} time formatting, and RFC 7807 error mapping.
+ */
 export const CorralModal: React.FC<CorralModalProps> = ({
   isOpen,
   farmId,
@@ -66,6 +71,7 @@ export const CorralModal: React.FC<CorralModalProps> = ({
 
   if (!isOpen) return null;
 
+  /** Validates form fields and normalizes the ESP32 MAC address before submission. */
   const validateClientSide = (): { valid: boolean; sanitizedMac: string } => {
     const errors: Record<string, string> = {};
     let sanitized = '';
@@ -104,6 +110,7 @@ export const CorralModal: React.FC<CorralModalProps> = ({
     return { valid: Object.keys(errors).length === 0, sanitizedMac: sanitized };
   };
 
+  /** Submits create/edit corral payloads and maps 409 or invalidParams errors to fields. */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setGeneralError(null);
@@ -196,7 +203,6 @@ export const CorralModal: React.FC<CorralModalProps> = ({
         )}
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-3.5">
-          {/* Nome do Curral */}
           <div>
             <label
               htmlFor="corral-name"
@@ -236,7 +242,6 @@ export const CorralModal: React.FC<CorralModalProps> = ({
             )}
           </div>
 
-          {/* MAC Address */}
           <div>
             <label
               htmlFor="corral-mac"
@@ -286,7 +291,6 @@ export const CorralModal: React.FC<CorralModalProps> = ({
             </div>
           </div>
 
-          {/* Horário Diário de Limpeza */}
           <div>
             <label
               htmlFor="corral-time"
@@ -305,7 +309,6 @@ export const CorralModal: React.FC<CorralModalProps> = ({
             />
           </div>
 
-          {/* Limiar de Odor e Duração da Bomba */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label

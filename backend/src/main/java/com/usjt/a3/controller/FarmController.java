@@ -13,6 +13,9 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * REST endpoints for creating, listing, renaming, and deleting farms owned by the authenticated user.
+ */
 @RestController
 @RequestMapping("/api/v1/farms")
 @RequiredArgsConstructor

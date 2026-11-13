@@ -22,6 +22,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * Manages unknown-RFID identification pendencies generated during MQTT tag ingestion and their manual resolution.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -37,8 +40,11 @@ public class IdentifyPendencyService {
     private CorralSseService corralSseService;
 
     /**
-     * Lists open (unresolved) RFID identification pendencies for a given corral.
-     * Enforces tenant ownership verification.
+     * Lists open (unresolved) RFID identification pendencies for a corral owned by the requesting user.
+     *
+     * @param corralId target corral identifier
+     * @param userId authenticated owner identifier
+     * @return unresolved pendencies ordered newest-first
      */
     @Transactional(readOnly = true)
     public List<IdentifyPendencyResponseDTO> listOpenPendencies(Long corralId, Long userId) {
@@ -46,7 +52,12 @@ public class IdentifyPendencyService {
     }
 
     /**
-     * Lists open pendencies with optional farmId consistency check for nested routes.
+     * Lists open pendencies while verifying optional parent {@code farmId} containment for nested routes.
+     *
+     * @param corralId target corral identifier
+     * @param farmId optional parent farm identifier
+     * @param userId authenticated owner identifier
+     * @return unresolved pendencies ordered newest-first
      */
     @Transactional(readOnly = true)
     public List<IdentifyPendencyResponseDTO> listOpenPendencies(Long corralId, Long farmId, Long userId) {
@@ -69,43 +80,43 @@ public class IdentifyPendencyService {
     }
 
     /**
-     * Resolves an open identification pendency by binding it to a registered animal.
-     * Updates animal presence and creates an audit AnimalEvent (EventOrigin.MANUAL).
+     * Resolves an open identification pendency by associating it with a same-farm registered animal.
+     *
+     * <p>Updates the animal's {@code currentCorral} per the pendency's event type, records a {@link EventOrigin#MANUAL}
+     * {@link AnimalEvent} audit entry, and emits an SSE {@code pendencia} notification.</p>
+     *
+     * @param pendencyId pendency identifier
+     * @param animalId registered animal identifier belonging to the same farm
+     * @param userId authenticated owner identifier
+     * @return resolved pendency DTO
      */
     @Transactional
     public IdentifyPendencyResponseDTO resolvePendency(Long pendencyId, Long animalId, Long userId) {
-        // 1. Verifica existência da pendência
         IdentifyPendency pendency = identifyPendencyRepository.findById(pendencyId)
                 .orElseThrow(() -> new EntityNotFoundException("Pendência de identificação não encontrada com ID: " + pendencyId));
 
-        // 2. Valida ownership do curral e da fazenda
         Corral corral = pendency.getCorral();
         if (corral == null || corral.getFarm() == null || corral.getFarm().getUser() == null
                 || !corral.getFarm().getUser().getId().equals(userId)) {
             throw new SecurityException("Você não tem permissão para resolver pendências deste curral");
         }
 
-        // 3. Verifica se a pendência já foi resolvida
         if (Boolean.TRUE.equals(pendency.getResolved())) {
             throw new IllegalStateException("Esta pendência de identificação já foi resolvida anteriormente");
         }
 
-        // 4. Verifica existência do animal
         Animal animal = animalRepository.findById(animalId)
                 .orElseThrow(() -> new EntityNotFoundException("Animal não encontrado com ID: " + animalId));
 
-        // 5. Verifica se o animal pertence à mesma fazenda do curral
         if (animal.getFarm() == null || !animal.getFarm().getId().equals(corral.getFarm().getId())) {
             throw new IllegalStateException("O animal selecionado pertence a uma fazenda diferente da fazenda do curral");
         }
 
-        // 6. Atualiza a pendência
         pendency.setAnimal(animal);
         pendency.setResolved(true);
         pendency.setResolvedAt(LocalDateTime.now());
         IdentifyPendency savedPendency = identifyPendencyRepository.save(pendency);
 
-        // 7. Atualiza localização do animal conforme o evento da pendência
         if (pendency.getAnimalEventType() == AnimalEventType.ENTROU) {
             animal.setCurrentCorral(corral);
             log.info("Animal ID {} ('{}') alocado no curral ID {} após resolução da pendência ID {}",
@@ -117,7 +128,6 @@ public class IdentifyPendencyService {
         }
         animalRepository.save(animal);
 
-        // 8. Registra evento de histórico com origem MANUAL
         AnimalEvent event = AnimalEvent.builder()
                 .corral(corral)
                 .animal(animal)
@@ -138,7 +148,13 @@ public class IdentifyPendencyService {
     }
 
     /**
-     * Creates an open IdentifyPendency when an unknown RFID tag is detected during MQTT ingestion.
+     * Persists an unresolved {@link IdentifyPendency} for an unrecognized or cross-farm RFID tag
+     * and notifies connected dashboard clients via SSE {@code pendencia}.
+     *
+     * @param corral corral where the tag was read
+     * @param tagUid raw RFID UID string (trimmed and uppercased)
+     * @param typeEvent detected presence transition
+     * @return persisted pendency entity
      */
     @Transactional
     public IdentifyPendency createPendency(Corral corral, String tagUid, AnimalEventType typeEvent) {

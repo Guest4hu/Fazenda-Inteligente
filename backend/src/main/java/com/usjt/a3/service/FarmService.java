@@ -17,6 +17,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+/**
+ * Manages farm lifecycle operations while enforcing owner isolation, per-user name uniqueness,
+ * and active-cleaning deletion locks.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -26,6 +30,13 @@ public class FarmService {
     private final FarmMapper farmMapper;
     private final CleanCmdRepository cleanCmdRepository;
 
+    /**
+     * Creates a farm for the authenticated user, rejecting duplicate farm names within the same account.
+     *
+     * @param farmRequestDTO farm creation payload
+     * @param userID authenticated owner identifier
+     * @return persisted farm DTO
+     */
     public FarmResponseDTO createFarm(FarmRequestDTO farmRequestDTO, Long userID) {
         User user = userRepository.findById(userID).orElseThrow(() -> new EntityNotFoundException("Não existe tal usuario cadastrado")
         );
@@ -45,6 +56,14 @@ public class FarmService {
                 .toList();
     }
 
+    /**
+     * Renames a farm after validating user ownership and per-user name uniqueness.
+     *
+     * @param farmId farm identifier
+     * @param farmRequestDTO updated farm fields
+     * @param userId authenticated owner identifier
+     * @return updated farm DTO
+     */
     @Transactional
     public FarmResponseDTO updateFarm(Long farmId, FarmRequestDTO farmRequestDTO, Long userId) {
         Farm farm = farmRepository.findById(farmId)
@@ -66,6 +85,13 @@ public class FarmService {
         return farmMapper.toDTO(updatedFarm);
     }
 
+    /**
+     * Deletes a farm owned by the user, blocking removal if any child corral currently has an active wash
+     * ({@link CleanState#EM_ANDAMENTO}).
+     *
+     * @param farmId farm identifier
+     * @param userId authenticated owner identifier
+     */
     @Transactional
     public void deleteFarm(Long farmId, Long userId) {
         Farm farm = farmRepository.findById(farmId)

@@ -1,6 +1,5 @@
 /**
- * src/services/authService.ts
- * Módulo de Autenticação e Registro de Usuários / Produtores Rurais.
+ * Authentication and registration service wrapping {@link apiClient} token/user storage.
  */
 
 import {
@@ -22,8 +21,9 @@ import type {
 export type { AuthUser };
 
 /**
- * Autentica um produtor rural com e-mail e senha.
- * Endpoint: POST /api/v1/auth/login
+ * Authenticates a user with email and password, persisting the returned JWT and user profile.
+ *
+ * @endpoint POST /api/v1/auth/login
  */
 export async function login(data: LoginRequestDTO): Promise<AuthResponseDTO> {
   const response = await apiClient<AuthResponseDTO>('/auth/login', {
@@ -47,8 +47,9 @@ export async function login(data: LoginRequestDTO): Promise<AuthResponseDTO> {
 }
 
 /**
- * Registra um novo produtor rural na plataforma.
- * Endpoint: POST /api/v1/auth/register
+ * Registers a new producer account and stores the issued JWT and profile upon success.
+ *
+ * @endpoint POST /api/v1/auth/register
  */
 export async function register(data: RegisterRequestDTO): Promise<AuthResponseDTO> {
   const response = await apiClient<AuthResponseDTO>('/auth/register', {
@@ -71,29 +72,23 @@ export async function register(data: RegisterRequestDTO): Promise<AuthResponseDT
   return response;
 }
 
-/**
- * Encerra a sessão do usuário no cliente.
- */
+/** Clears the in-memory and localStorage JWT token and stored user profile. */
 export function logout(): void {
   clearAuth();
 }
 
-/**
- * Retorna o token JWT atual.
- */
+/** Returns the active JWT access token, or {@code null} if unauthenticated. */
 export function getToken(): string | null {
   return getClientToken();
 }
 
-/**
- * Define ou remove o token JWT do armazenamento.
- */
+/** Updates or clears the active JWT token across memory and localStorage. */
 export function setToken(token: string | null): void {
   setClientToken(token);
 }
 
 /**
- * Retorna os dados do usuário autenticado no momento.
+ * Returns the authenticated user from storage, falling back to decoding JWT claims when present.
  */
 export function getUser(): AuthUser | null {
   const stored = getStoredUser();

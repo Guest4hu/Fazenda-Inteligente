@@ -1,6 +1,5 @@
 /**
- * src/services/animalService.ts
- * Gestão de Animais da Fazenda, Identificação RFID e Eventos de Presença (ENTROU/SAIU).
+ * Service for herd registry CRUD, RFID tag normalization, and corral presence registration.
  */
 
 import { apiClient } from './apiClient';
@@ -12,8 +11,9 @@ import type {
 } from '../types/api';
 
 /**
- * Lista todos os animais de uma fazenda com indicação do curral atual.
- * Endpoint: GET /api/v1/farms/{farmId}/animais
+ * Lists all cattle registered in a farm along with their current corral occupancy.
+ *
+ * @endpoint GET /api/v1/farms/{farmId}/animais
  */
 export async function listAnimals(farmId: number): Promise<AnimalResponseDTO[]> {
   const safeFarmId = encodeURIComponent(String(farmId));
@@ -23,8 +23,9 @@ export async function listAnimals(farmId: number): Promise<AnimalResponseDTO[]> 
 }
 
 /**
- * Busca detalhes de um animal por ID (rota direta ou aninhada).
- * Endpoint: GET /api/v1/animais/{animalId} ou GET /api/v1/farms/{farmId}/animais/{animalId}
+ * Retrieves an animal by ID via direct or farm-nested API path.
+ *
+ * @endpoint GET /api/v1/animais/{animalId}
  */
 export async function getAnimal(animalId: number, farmId?: number): Promise<AnimalResponseDTO> {
   const safeAnimalId = encodeURIComponent(String(animalId));
@@ -38,8 +39,9 @@ export async function getAnimal(animalId: number, farmId?: number): Promise<Anim
 }
 
 /**
- * Cadastra um novo animal vinculado a uma fazenda com sua Tag RFID.
- * Endpoint: POST /api/v1/farms/{farmId}/animais
+ * Registers a new animal in a farm, trimming and uppercasing its RFID {@code tagUid}.
+ *
+ * @endpoint POST /api/v1/farms/{farmId}/animais
  */
 export async function createAnimal(
   farmId: number,
@@ -58,8 +60,9 @@ export async function createAnimal(
 }
 
 /**
- * Atualiza os dados de um animal cadastrado.
- * Endpoint: PUT /api/v1/animais/{animalId} ou PUT /api/v1/farms/{farmId}/animais/{animalId}
+ * Updates an animal's details and normalized RFID {@code tagUid} via direct or nested path.
+ *
+ * @endpoint PUT /api/v1/animais/{animalId}
  */
 export async function updateAnimal(
   animalId: number,
@@ -83,8 +86,9 @@ export async function updateAnimal(
 }
 
 /**
- * Exclui um animal cadastrado da fazenda.
- * Endpoint: DELETE /api/v1/animais/{animalId}
+ * Deletes an animal from a farm.
+ *
+ * @endpoint DELETE /api/v1/animais/{animalId}
  */
 export async function deleteAnimal(animalId: number, farmId?: number): Promise<void> {
   const safeAnimalId = encodeURIComponent(String(animalId));
@@ -98,8 +102,10 @@ export async function deleteAnimal(animalId: number, farmId?: number): Promise<v
 }
 
 /**
- * Registra manualmente ou via RFID a presença de um animal no curral (ENTROU ou SAIU).
- * Endpoint: POST /api/v1/currais/{corralId}/presenca
+ * Records a corral entry or exit event ({@code ENTROU}/{@code SAIU}), normalizing {@code tagUid}
+ * and defaulting {@code origin} to {@code MANUAL}.
+ *
+ * @endpoint POST /api/v1/currais/{corralId}/presenca
  */
 export async function sendPresence(
   corralId: number,
@@ -119,8 +125,9 @@ export async function sendPresence(
 }
 
 /**
- * Lista a timeline de eventos de movimentação no curral (ordenados por instant DESC).
- * Endpoint: GET /api/v1/currais/{corralId}/eventos
+ * Fetches a corral's presence movement timeline ordered newest-first.
+ *
+ * @endpoint GET /api/v1/currais/{corralId}/eventos
  */
 export async function listEvents(corralId: number): Promise<AnimalEventResponseDTO[]> {
   const safeCorralId = encodeURIComponent(String(corralId));

@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "author": "Daniel.rib1",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": -150, "attrs": {} },
+    { "type": "wokwi-breadboard", "id": "bb1", "top": 10, "left": 70, "attrs": { "color": "#eeefed" } },
+    { "type": "wokwi-pir-motion-sensor", "id": "pir1", "top": -250, "left": 95, "attrs": { "delayTime": "3", "inhibitTime": "1" } },
+    { "type": "wokwi-dht22", "id": "dht1", "top": -230, "left": 305, "attrs": {} },
+    { "type": "wokwi-gas-sensor", "id": "gas1", "top": -230, "left": 470, "attrs": {} },
+    { "type": "wokwi-relay-module", "id": "relay1", "top": 230, "left": 540, "attrs": { "transistor": "pnp" } },
+    { "type": "wokwi-led", "id": "led1", "top": 230, "left": 680, "attrs": { "color": "red", "flip": "" } },
+    { "type": "wokwi-resistor", "id": "r3", "top": 175, "left": 650, "attrs": { "value": "220" } }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+
+    [ "esp:GND.2", "bb1:tn.1", "black", [] ],
+    [ "bb1:tn.25", "bb1:tn.26", "black", [] ],
+    [ "bb1:tn.50", "bb1:bn.50", "black", [] ],
+    [ "bb1:bn.25", "bb1:bn.26", "black", [] ],
+
+    [ "esp:3V3", "bb1:tp.1", "orange", [] ],
+    [ "bb1:tp.25", "bb1:tp.26", "orange", [] ],
+
+    [ "esp:5V", "bb1:bp.1", "red", [] ],
+    [ "bb1:bp.25", "bb1:bp.26", "red", [] ],
+
+    [ "pir1:VCC", "bb1:tp.5", "orange", [] ],
+    [ "pir1:GND", "bb1:tn.6", "black", [] ],
+    [ "pir1:OUT", "esp:27", "green", [] ],
+
+    [ "dht1:VCC", "bb1:tp.18", "orange", [] ],
+    [ "dht1:GND", "bb1:tn.19", "black", [] ],
+    [ "dht1:SDA", "esp:32", "green", [] ],
+
+    [ "gas1:VCC", "bb1:bp.30", "red", [] ],
+    [ "gas1:GND", "bb1:tn.30", "black", [] ],
+    [ "gas1:A0", "esp:34", "purple", [] ],
+
+    [ "relay1:VCC", "bb1:bp.42", "red", [] ],
+    [ "relay1:COM", "bb1:bp.44", "red", [] ],
+    [ "relay1:GND", "bb1:bn.43", "black", [] ],
+    [ "relay1:IN", "esp:26", "white", [] ],
+
+    [ "relay1:NO", "bb1:55b.j", "white", [] ],
+    [ "bb1:55b.f", "led1:A", "white", [] ],
+    [ "led1:C", "bb1:58b.f", "black", [] ],
+    [ "r3:1", "bb1:58b.i", "black", [] ],
+    [ "r3:2", "bb1:bn.48", "black", [] ]
+  ],
+  "dependencies": {}
+}
