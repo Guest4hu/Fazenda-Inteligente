@@ -6,7 +6,9 @@ import com.usjt.a3.service.IdentifyPendencyService;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * @deprecated Use {@link CommandRfidLeitura} em vez desta classe.
+ * Backward-compatible alias for the legacy RFID handler bean name.
+ *
+ * @deprecated Use {@link CommandRfidLeitura} instead.
  */
 @Deprecated
 public class CommandAnimalRFIDTag extends CommandRfidLeitura {
