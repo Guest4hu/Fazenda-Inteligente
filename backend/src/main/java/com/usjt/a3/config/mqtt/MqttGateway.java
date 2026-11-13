@@ -4,6 +4,9 @@ import org.springframework.integration.annotation.MessagingGateway;
 import org.springframework.integration.mqtt.support.MqttHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 
+/**
+ * Spring Integration messaging gateway for publishing payloads to MQTT topics.
+ */
 @MessagingGateway(defaultRequestChannel = "mqttOutboundChannel")
 public interface MqttGateway {
     void sendToMqtt(String payload, @Header(MqttHeaders.TOPIC) String topic);
