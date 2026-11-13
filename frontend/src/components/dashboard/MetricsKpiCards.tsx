@@ -17,6 +17,11 @@ export interface MetricsKpiCardsProps {
   isLoading?: boolean;
 }
 
+/**
+ * Renders the KPI cards for ambient DHT22 temperature/humidity and MQ-135 raw
+ * ADC odor readings, highlighting threshold alerts against {@code limitOdor}
+ * and switching cleanly between live telemetry and local simulation metrics.
+ */
 export const MetricsKpiCards: React.FC<MetricsKpiCardsProps> = ({
   temp,
   hum,
@@ -86,7 +91,7 @@ export const MetricsKpiCards: React.FC<MetricsKpiCardsProps> = ({
         </div>
       </dl>
 
-      {/* Indicador de Status do Limiar */}
+      {/* MQ-135 gas threshold status */}
       <div className="mt-3 flex items-center justify-between text-xs px-1 text-muted-foreground">
         <span>MQ-135: leitura analógica bruta sem calibração.</span>
         {isOdorHigh ? (
@@ -100,7 +105,7 @@ export const MetricsKpiCards: React.FC<MetricsKpiCardsProps> = ({
         )}
       </div>
 
-      {/* Cartões Complementares de Métricas Consolidadas do Curral */}
+      {/* Consolidated corral operational metrics */}
       {metrics && (
         <div className="mt-3 grid grid-cols-3 gap-2 pt-2 border-t border-border/60 text-xs">
           <div className="bg-background/80 rounded-lg p-2 text-center border border-border/40">
@@ -124,7 +129,6 @@ export const MetricsKpiCards: React.FC<MetricsKpiCardsProps> = ({
         </div>
       )}
 
-      {/* Botão de Atualizar Preservado */}
       {onRefresh && (
         <button
           onClick={onRefresh}
