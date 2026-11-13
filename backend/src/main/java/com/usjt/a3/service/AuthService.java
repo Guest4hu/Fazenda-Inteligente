@@ -12,6 +12,9 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+/**
+ * Handles user credential authentication and account registration with BCrypt password hashing and JWT issuance.
+ */
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -20,6 +23,12 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final TokenService tokenService;
 
+    /**
+     * Authenticates a user by email and BCrypt password match, returning user details and a signed JWT.
+     *
+     * @param requestDTO login credentials
+     * @return authentication response with signed JWT
+     */
     public AuthResponseDTO login (LoginRequestDTO requestDTO){
         User user = userRepository.findByEmail(requestDTO.email())
                 .orElseThrow(() -> new BadCredentialsException("Email ou senha invalidos"));
@@ -29,6 +38,13 @@ public class AuthService {
         return userMapper.toAuthResponseDTO(user,token);
     }
 
+    /**
+     * Registers a new producer account after verifying email uniqueness, hashes the password via BCrypt,
+     * and returns an immediately usable JWT.
+     *
+     * @param requestDTO registration payload
+     * @return authentication response with signed JWT
+     */
     public AuthResponseDTO register (RegisterRequestDTO requestDTO){
         if (userRepository.existsByEmail(requestDTO.email())) {
             throw new IllegalStateException("Email ja cadastado");
