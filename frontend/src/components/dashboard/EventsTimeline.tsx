@@ -39,6 +39,11 @@ const kindCls: Record<Kind, string> = {
   danger: 'bg-destructive',
 };
 
+/**
+ * Renders a unified activity feed displaying backend animal presence events
+ * ({@code liveEvents}) followed by local operational and simulation logs
+ * ({@code systemLogs}).
+ */
 export const EventsTimeline: React.FC<EventsTimelineProps> = ({
   isLive = false,
   corralName,
@@ -49,7 +54,7 @@ export const EventsTimeline: React.FC<EventsTimelineProps> = ({
 }) => {
   const effectiveLogs = propEvents || systemLogs;
 
-  // Unifica e ordena os eventos para exibição cronológica descendente
+  // Map backend animal presence events followed by local operational/simulation logs
   const timelineItems: UnifiedTimelineItem[] = useMemo(() => {
     const items: UnifiedTimelineItem[] = [];
 
@@ -63,7 +68,7 @@ export const EventsTimeline: React.FC<EventsTimelineProps> = ({
       }
     };
 
-    // Mapeia eventos da API backend
+    // Map backend animal presence events
     liveEvents.forEach((ev) => {
       const isEntry = ev.typeEvent === 'ENTROU';
       items.push({
@@ -79,7 +84,7 @@ export const EventsTimeline: React.FC<EventsTimelineProps> = ({
       });
     });
 
-    // Mapeia logs de sistema/simulação locais
+    // Map local system and simulation logs
     effectiveLogs.forEach((log) => {
       items.push({
         id: `sys-${log.id}`,
@@ -119,7 +124,6 @@ export const EventsTimeline: React.FC<EventsTimelineProps> = ({
         </div>
       </div>
 
-      {/* Lista com data-testid="list-events" */}
       <ol
         className="mt-3 max-h-80 overflow-auto divide-y divide-border"
         data-testid="list-events"
@@ -131,18 +135,15 @@ export const EventsTimeline: React.FC<EventsTimelineProps> = ({
         ) : (
           timelineItems.map((item) => (
             <li key={item.id} className="pop flex items-start gap-3 py-2">
-              {/* Ponto indicador de estado */}
               <span
                 className={`mt-1.5 size-2.5 rounded-full shrink-0 ${kindCls[item.kind]}`}
                 aria-hidden
               />
 
-              {/* Timestamp formatado */}
               <time className="font-mono text-xs text-muted-foreground pt-0.5 shrink-0">
                 {item.timeStr}
               </time>
 
-              {/* Detalhes do evento */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span
@@ -153,7 +154,7 @@ export const EventsTimeline: React.FC<EventsTimelineProps> = ({
                     {item.title}
                   </span>
 
-                  {/* Badges de Presença RFID */}
+                  {/* RFID presence event badge */}
                   {item.eventType && (
                     <span
                       className={`font-mono text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
