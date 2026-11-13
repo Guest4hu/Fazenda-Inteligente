@@ -8,9 +8,19 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Spring Data repository for {@link Corral} lookup by MAC address, farm ownership, and scheduled cleans.
+ */
 @Repository
 public interface CorralRepository extends JpaRepository<Corral, Long> {
 
+    /**
+     * Looks up a corral by normalized MAC while eagerly fetching {@code farm.user} for MQTT ingestion
+     * outside an active HTTP persistence session.
+     *
+     * @param macAddress normalized uppercased 12-hex-character MAC address
+     * @return matching corral with its owning farm and user loaded, if present
+     */
     @EntityGraph(attributePaths = {"farm.user"})
     Optional<Corral> findByMacAddress(String macAddress);
 
