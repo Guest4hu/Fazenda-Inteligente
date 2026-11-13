@@ -1,6 +1,5 @@
 /**
- * src/services/pendencyService.ts
- * Gestão e Resolução de Pendências de Identificação RFID (Tags desconhecidas).
+ * Service for listing and resolving unrecognized RFID identification pendencies.
  */
 
 import { apiClient } from './apiClient';
@@ -10,8 +9,9 @@ import type {
 } from '../types/api';
 
 /**
- * Lista pendências de identificação de tags RFID não associadas em um curral.
- * Endpoint: GET /api/v1/currais/{corralId}/pendencias ou GET /api/v1/farms/{farmId}/currais/{corralId}/pendencias
+ * Lists unresolved RFID identification alerts for a corral via flat or farm-nested paths.
+ *
+ * @endpoint GET /api/v1/currais/{corralId}/pendencias
  */
 export async function listPendencies(
   corralId: number,
@@ -28,8 +28,9 @@ export async function listPendencies(
 }
 
 /**
- * Resolve uma pendência de identificação vinculando a tag lida a um animal existente.
- * Endpoint: POST /api/v1/pendencias/{pendencyId}/resolver (ou PUT)
+ * Resolves an open identification pendency by binding the detected tag to an existing farm animal.
+ *
+ * @endpoint POST|PUT /api/v1/pendencias/{pendencyId}/resolver
  */
 export async function resolvePendency(
   pendencyId: number,
