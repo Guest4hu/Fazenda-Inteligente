@@ -11,6 +11,10 @@ export interface AuthDialogProps {
   isBackendOnline?: boolean | null;
 }
 
+/**
+ * Authentication modal handling operator sign-in and registration, displaying
+ * contextual backend-offline guidance and mapping 401/409/RFC 7807 field errors.
+ */
 export const AuthDialog: React.FC<AuthDialogProps> = ({
   isOpen,
   onClose,
@@ -138,7 +142,6 @@ export const AuthDialog: React.FC<AuthDialogProps> = ({
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/40 backdrop-blur-xs animate-in fade-in duration-200"
     >
       <div className="relative w-full max-w-md rounded-2xl border border-card-border bg-card p-6 sm:p-8 shadow-xl text-foreground">
-        {/* Botão de Fechar */}
         <button
           onClick={onClose}
           data-testid="button-auth-close"
@@ -157,7 +160,7 @@ export const AuthDialog: React.FC<AuthDialogProps> = ({
             : 'Cadastre sua conta para monitoramento em tempo real.'}
         </p>
 
-        {/* Alerta Contextual quando o Backend Spring Boot está Offline */}
+        {/* Contextual warning when Spring Boot backend is offline */}
         {isBackendOnline === false && (
           <div
             role="note"
@@ -174,7 +177,6 @@ export const AuthDialog: React.FC<AuthDialogProps> = ({
           </div>
         )}
 
-        {/* Abas de Navegação */}
         <div
           role="tablist"
           className="mt-5 grid grid-cols-2 gap-1 p-1 rounded-xl bg-muted text-sm font-semibold"
@@ -209,7 +211,6 @@ export const AuthDialog: React.FC<AuthDialogProps> = ({
           </button>
         </div>
 
-        {/* Banner de Erro Geral */}
         {generalError && (
           <div
             role="alert"
@@ -243,7 +244,6 @@ export const AuthDialog: React.FC<AuthDialogProps> = ({
         )}
 
         <form onSubmit={handleSubmit} noValidate className="mt-4 space-y-4">
-          {/* Campo Nome (Apenas Cadastro) */}
           {mode === 'register' && (
             <div>
               <label
@@ -281,7 +281,6 @@ export const AuthDialog: React.FC<AuthDialogProps> = ({
             </div>
           )}
 
-          {/* Campo E-mail */}
           <div>
             <label
               htmlFor="auth-email"
@@ -317,7 +316,6 @@ export const AuthDialog: React.FC<AuthDialogProps> = ({
             )}
           </div>
 
-          {/* Campo Senha */}
           <div>
             <label
               htmlFor="auth-password"
@@ -353,7 +351,6 @@ export const AuthDialog: React.FC<AuthDialogProps> = ({
             )}
           </div>
 
-          {/* Botão de Submissão */}
           <button
             type="submit"
             disabled={isSubmitting}
@@ -373,7 +370,7 @@ export const AuthDialog: React.FC<AuthDialogProps> = ({
           </button>
         </form>
 
-        {/* Cartão de Ajuda para Demonstração / Teste Rápido */}
+        {/* Demo credentials quick-fill helper card */}
         <div className="mt-4 p-3 rounded-xl bg-muted/60 border border-border/80 text-xs text-muted-foreground flex items-center justify-between gap-2">
           <div className="min-w-0">
             <p className="font-semibold text-foreground flex items-center gap-1.5">
