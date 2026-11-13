@@ -6,6 +6,11 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 
+/**
+ * Unresolved RFID identification alert generated when an unrecognized or cross-farm tag is read via MQTT.
+ *
+ * <p>{@link #prePersist()} initializes {@code resolved = false} and stamps the detection {@code instant}.</p>
+ */
 @Entity
 @Table(name = "identify_pendency")
 @Getter
