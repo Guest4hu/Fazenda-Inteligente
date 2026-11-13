@@ -17,6 +17,13 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.util.Optional;
 
+/**
+ * Inbound MQTT handler for {@link EntryTopics#RFID_LEITURA} cattle tag read events.
+ *
+ * <p>Accepts multiple legacy/simulator JSON field aliases for tag UID and event type, delegates presence
+ * reconciliation to {@link AnimalService#registerPresence} with {@link EventOrigin#TAG}, and opens an
+ * {@link com.usjt.a3.model.entity.IdentifyPendency} when an unrecognized or cross-farm tag is encountered.</p>
+ */
 @Slf4j
 @Component
 public class CommandRfidLeitura implements CommandReceiveMqtt {
@@ -37,6 +44,14 @@ public class CommandRfidLeitura implements CommandReceiveMqtt {
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * Backward-compatible constructor without pendency creation support.
+     *
+     * @param corralRepository repository for corral MAC lookup
+     * @param animalService    service handling RFID presence toggling
+     * @param objectMapper     Jackson mapper for JSON payload parsing
+     * @deprecated Prefer the 4-argument constructor injecting {@link IdentifyPendencyService}.
+     */
     @Deprecated
     public CommandRfidLeitura(CorralRepository corralRepository,
                               AnimalService animalService,
@@ -49,6 +64,14 @@ public class CommandRfidLeitura implements CommandReceiveMqtt {
         return EntryTopics.RFID_LEITURA;
     }
 
+    /**
+     * Normalizes MAC, tag UID, and event type synonyms from JSON, records {@link EventOrigin#TAG} presence,
+     * and creates an unresolved pendency on {@link EntityNotFoundException} while isolating malformed payloads
+     * or business errors from the MQTT listener thread.
+     *
+     * @param macAddress raw or formatted controller MAC address
+     * @param payload raw JSON RFID read payload
+     */
     @Override
     public void tratar(String macAddress, String payload) {
         if (macAddress == null || macAddress.isBlank()) {
