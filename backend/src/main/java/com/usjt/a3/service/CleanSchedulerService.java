@@ -12,6 +12,9 @@ import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
+/**
+ * Periodic scheduler that triggers {@link CleanOrigin#AUTOMATICA} corral washes at their configured {@code cleanTime}.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -21,8 +24,11 @@ public class CleanSchedulerService {
     private final CleanService cleanService;
 
     /**
-     * Executa no segundo 0 de cada minuto para verificar se há currais
-     * com horário de limpeza automática programado (cleanTime) para o minuto atual.
+     * Runs at second 0 of every minute and dispatches scheduled cleaning commands for corrals
+     * whose {@code cleanTime} matches the current minute.
+     *
+     * <p>Per-corral failures (e.g., animal present or offline device) are caught individually
+     * so one blocked corral does not abort remaining scheduled corrals.</p>
      */
     @Scheduled(cron = "0 * * * * *")
     public void executeScheduledCleanings() {
