@@ -26,6 +26,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * Manages cattle registry records, RFID tag uniqueness, and corral presence transitions.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -41,6 +44,14 @@ public class AnimalService {
     @Autowired(required = false)
     private CorralSseService corralSseService;
 
+    /**
+     * Registers a new animal in a user-owned farm with a globally unique uppercased RFID {@code tagUid}.
+     *
+     * @param farmId target farm identifier
+     * @param userId authenticated owner identifier
+     * @param requestDTO animal registration details
+     * @return created animal DTO
+     */
     public AnimalResponseDTO createAnimal(Long farmId, Long userId, AnimalRequestDTO requestDTO) {
         Farm farm = farmRepository.findById(farmId)
                 .orElseThrow(() -> new EntityNotFoundException("Fazenda não encontrada com ID: " + farmId));
@@ -75,6 +86,22 @@ public class AnimalService {
                 .toList();
     }
 
+    /**
+     * Records an animal entry or exit event for a corral, reconciling live {@code currentCorral} state
+     * and emitting SSE {@code presenca} notifications.
+     *
+     * <p>When {@code origin == EventOrigin.TAG}, the database acts as Single Source of Truth toggling
+     * {@code ENTROU}/{@code SAIU} automatically, and cross-farm tags raise {@link EntityNotFoundException}
+     * so MQTT handlers can open an identification pendency. When {@code origin == EventOrigin.MANUAL},
+     * same-farm ownership and non-redundant transition checks are strictly enforced. Entering a new corral
+     * while present in another emits an automatic prior {@code SAIU} event timestamped 1 ms earlier.</p>
+     *
+     * @param corralId target corral identifier
+     * @param farmId optional parent farm identifier for nested route validation
+     * @param userId authenticated owner identifier
+     * @param request tag UID, origin, and manual event type
+     * @return recorded presence event DTO
+     */
     @Transactional
     public AnimalEventResponseDTO registerPresence(Long corralId, Long farmId, Long userId, AnimalPresenceRequestDTO request) {
         Corral corral = corralRepository.findById(corralId)
@@ -95,13 +122,10 @@ public class AnimalService {
         EventOrigin origin = request.origin() != null ? request.origin() : EventOrigin.MANUAL;
 
         if (origin == EventOrigin.TAG) {
-            // Se a tag lida pelo leitor RFID não pertencer à mesma fazenda deste curral, deve disparar
-            // EntityNotFoundException para que o CommandRfidLeitura crie uma IdentifyPendency.
             if (animal.getFarm() == null || !animal.getFarm().getId().equals(corral.getFarm().getId())) {
                 throw new EntityNotFoundException("Nenhum animal cadastrado nesta fazenda com a Tag RFID: " + normalizedTag);
             }
         } else {
-            // Regra MANUAL: Validação estrita de propriedade do produtor e vinculação com a fazenda.
             if (animal.getFarm() == null || !animal.getFarm().getUser().getId().equals(userId)) {
                 throw new SecurityException("Você não tem permissão para registrar presenças para este animal");
             }
@@ -114,15 +138,12 @@ public class AnimalService {
         AnimalEventType effectiveType;
 
         if (origin == EventOrigin.TAG) {
-            // Regra RFID (TAG): Base de dados como fonte única da verdade (Single Source of Truth).
-            // O estado real do animal no banco determina o evento, prevenindo duplicidades consecutivas do hardware/ESP32.
             if (currentCorral != null && currentCorral.getId().equals(corralId)) {
                 effectiveType = AnimalEventType.SAIU;
             } else {
                 effectiveType = AnimalEventType.ENTROU;
             }
         } else {
-            // Regra MANUAL: Validação estrita para evitar estados duplicados consecutivos.
             effectiveType = request.typeEvent();
             if (effectiveType == null) {
                 throw new IllegalArgumentException("O tipo do evento (ENTROU ou SAIU) é obrigatório");
@@ -139,8 +160,6 @@ public class AnimalService {
         }
 
         if (effectiveType == AnimalEventType.ENTROU) {
-            // Consistência de transferência entre currais: se o animal estava em outro curral,
-            // registra automaticamente o evento de SAIU no curral anterior antes da nova entrada.
             if (currentCorral != null && !currentCorral.getId().equals(corralId)) {
                 AnimalEvent exitPrevious = animalEventMapper.toEntity(currentCorral, animal, AnimalEventType.SAIU, origin);
                 exitPrevious.setInstant(LocalDateTime.now().minusNanos(1_000_000));
@@ -185,6 +204,14 @@ public class AnimalService {
         return registerPresence(corralId, null, userId, request);
     }
 
+    /**
+     * Lists presence history events for a corral, enforcing user ownership and optional farm containment.
+     *
+     * @param corralId target corral identifier
+     * @param farmId   optional farm identifier; when non-null, verifies the corral belongs to that farm
+     * @param userId   authenticated owner identifier
+     * @return corral animal movement events ordered from newest to oldest
+     */
     public List<AnimalEventResponseDTO> listEventsByCorral(Long corralId, Long farmId, Long userId) {
         Corral corral = corralRepository.findById(corralId)
                 .orElseThrow(() -> new EntityNotFoundException("Curral não encontrado com ID: " + corralId));
