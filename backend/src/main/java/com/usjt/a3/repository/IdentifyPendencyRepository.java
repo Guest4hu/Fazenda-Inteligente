@@ -6,18 +6,23 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
+/**
+ * Spring Data repository for unresolved RFID identification alerts.
+ */
 @Repository
 public interface IdentifyPendencyRepository extends JpaRepository<IdentifyPendency, Long> {
 
-    // 1. Fila de pendências abertas de um curral específico (aproveita o índice parcial do banco)
+    /**
+     * Lists unresolved pendencies for a corral newest-first, backed by the partial DB index on {@code resolved = false}.
+     *
+     * @param corralId corral identifier
+     * @return open identification pendencies ordered from newest to oldest
+     */
     List<IdentifyPendency> findByCorralIdAndResolvedFalseOrderByInstantDesc(Long corralId);
 
-    // 2. Todas as pendências abertas no sistema para a tela do operador
     List<IdentifyPendency> findByResolvedFalseOrderByInstantDesc();
 
-    // 3. Contador de pendências para exibir badge/alerta no painel
     long countByResolvedFalse();
 
-    // 4. Contador de pendências abertas para um curral específico
     long countByCorralIdAndResolvedFalse(Long corralId);
 }
