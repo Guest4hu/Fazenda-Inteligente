@@ -9,16 +9,22 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Spring Data repository for MQ-135 gas and DHT environmental telemetry samples.
+ */
 @Repository
 public interface OdorTelemetryRepository extends JpaRepository<OdorTelemetry, Long> {
 
-    // 1. Busca a leitura mais recente de um curral para o avaliador de odor (MQTT)
     Optional<OdorTelemetry> findFirstByCorralIdOrderByInstantDesc(Long corralId);
 
-    // 2. Busca as últimas 30 leituras para plotar o gráfico no dashboard
+    /**
+     * Returns the latest 30 samples for dashboard charting while eagerly fetching {@code corral} via {@link EntityGraph}.
+     *
+     * @param corralId corral identifier
+     * @return up to 30 most recent gas/environmental telemetry records ordered newest-first
+     */
     @EntityGraph(attributePaths = {"corral"})
     List<OdorTelemetry> findTop30ByCorralIdOrderByInstantDesc(Long corralId);
 
-    // 3. Expurgo de histórico antigo (manutenção)
     void deleteByInstantBefore(LocalDateTime threshold);
 }
