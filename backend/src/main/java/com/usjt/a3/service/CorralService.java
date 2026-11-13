@@ -26,6 +26,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * Manages smart corral registration, operational threshold configuration, real-time metrics aggregation,
+ * and MQTT device heartbeat status updates.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -40,6 +44,15 @@ public class CorralService {
     @Autowired(required = false)
     private CorralSseService corralSseService;
 
+    /**
+     * Registers a new corral under a user-owned farm after normalizing its MAC address to uppercase hex
+     * without separators and verifying global MAC uniqueness.
+     *
+     * @param corralRequestDTO corral creation payload
+     * @param userId authenticated owner identifier
+     * @param farmId parent farm identifier
+     * @return created corral DTO
+     */
     public CorralResponseDTO createCorral(CorralRequestDTO corralRequestDTO, Long userId, Long farmId) {
         Farm farm = farmRepository.findById(farmId).orElseThrow(() -> new EntityNotFoundException("Farm não encontrada"));
 
@@ -105,6 +118,16 @@ public class CorralService {
         return updateCorral(corralId, null, userId, dto);
     }
 
+    /**
+     * Updates corral metadata, MAC address, and operational parameters while guarding against duplicate MACs
+     * and applying default thresholds ({@code limitOdor = 400}, {@code pumpDurationSeconds = 30}) when omitted.
+     *
+     * @param corralId target corral identifier
+     * @param farmId   optional farm identifier for containment verification
+     * @param userId   authenticated owner identifier
+     * @param dto      updated corral attributes and parameters
+     * @return updated corral response DTO with effective device status
+     */
     @Transactional
     public CorralResponseDTO updateCorral(Long corralId, Long farmId, Long userId, CorralRequestDTO dto) {
         Corral corral = corralRepository.findById(corralId)
@@ -139,6 +162,13 @@ public class CorralService {
         deleteCorral(corralId, null, userId);
     }
 
+    /**
+     * Deletes a corral only if no {@link CleanState#EM_ANDAMENTO} or {@link CleanState#PENDENTE} wash commands exist.
+     *
+     * @param corralId target corral identifier
+     * @param farmId   optional farm identifier for containment verification
+     * @param userId   authenticated owner identifier
+     */
     @Transactional
     public void deleteCorral(Long corralId, Long farmId, Long userId) {
         Corral corral = corralRepository.findById(corralId)
@@ -173,6 +203,16 @@ public class CorralService {
         return updateParameters(corralId, null, userId, dto);
     }
 
+    /**
+     * Updates automation parameters ({@code cleanTime}, {@code limitOdor}, {@code pumpDurationSeconds}),
+     * preserving existing non-null thresholds or initializing defaults when omitted.
+     *
+     * @param corralId target corral identifier
+     * @param farmId   optional farm identifier for containment verification
+     * @param userId   authenticated owner identifier
+     * @param dto      updated automation parameters
+     * @return updated corral response DTO
+     */
     @Transactional
     public CorralResponseDTO updateParameters(Long corralId, Long farmId, Long userId, CorralParametersRequestDTO dto) {
         Corral corral = corralRepository.findById(corralId)
@@ -210,6 +250,15 @@ public class CorralService {
         return getCorralMetrics(corralId, null, userId);
     }
 
+    /**
+     * Aggregates operational metrics for a corral, including occupied vs. farm-total cattle counts,
+     * today's cleaning counts grouped by {@link CleanOrigin}, open pendency count, and effective liveness.
+     *
+     * @param corralId target corral identifier
+     * @param farmId   optional farm identifier for containment verification
+     * @param userId   authenticated owner identifier
+     * @return aggregated corral operational metrics
+     */
     @Transactional(readOnly = true)
     public CorralMetricsResponseDTO getCorralMetrics(Long corralId, Long farmId, Long userId) {
         Corral corral = corralRepository.findById(corralId)
@@ -273,6 +322,10 @@ public class CorralService {
         );
     }
 
+    /**
+     * Derives effective device connectivity by downgrading {@link DeviceStatus#ONLINE} to
+     * {@link DeviceStatus#OFFLINE} when {@code lastSeenAt} is missing or older than 60 seconds.
+     */
     private DeviceStatus resolveEffectiveStatus(Corral corral) {
         if (corralMapper != null) {
             DeviceStatus s = corralMapper.resolveEffectiveStatus(corral);
@@ -292,6 +345,13 @@ public class CorralService {
         return DeviceStatus.ONLINE;
     }
 
+    /**
+     * Updates a controller's {@link DeviceStatus} from MQTT LWT/status payloads, refreshes
+     * {@code lastSeenAt} on {@link DeviceStatus#ONLINE}, and broadcasts an SSE {@code status} event.
+     *
+     * @param macAddress raw or formatted device MAC address
+     * @param status reported connectivity state
+     */
     public void updateDeviceStatus(String macAddress, DeviceStatus status) {
         String normalizedMac = macAddress.replace(":", "").replace("-", "").trim().toUpperCase();
         corralRepository.findByMacAddress(normalizedMac).ifPresentOrElse(corral -> {
