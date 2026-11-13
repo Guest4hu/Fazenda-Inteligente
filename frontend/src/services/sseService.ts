@@ -1,18 +1,7 @@
 /**
- * src/services/sseService.ts
- * Serviço de Server-Sent Events (SSE) para streaming reativo em tempo real do curral.
- * 
- * Conecta-se aos endpoints do Spring Boot:
- *   - /api/v1/currais/{corralId}/stream
- *   - /api/v1/farms/{farmId}/currais/{corralId}/stream
- * 
- * Eventos suportados:
- *   - 'connected': Confirmação de conexão SSE com { corralId, status }
- *   - 'odor': Telemetria de odor recebida do sensor MQ-135 (OdorTelemetryResponseDTO)
- *   - 'presenca': Movimentação de animais via RFID / trava biológica (AnimalEventResponseDTO)
- *   - 'pendencia': Pendências geradas para tags RFID desconhecidas (IdentifyPendencyResponseDTO)
- *   - 'limpeza': Comandos e status de acionamento de bomba d'água (CleanCmdResponseDTO)
- *   - 'status': Atualizações de conectividade e status do hardware ESP32 (CorralResponseDTO)
+ * Real-time Server-Sent Events (SSE) client subscribing to named corral stream events
+ * ({@code connected}, {@code odor}, {@code presenca}, {@code pendencia}, {@code limpeza}, {@code status})
+ * with capped exponential-backoff reconnection and dynamic JWT resolution.
  */
 
 import { getToken } from './apiClient';
@@ -28,9 +17,6 @@ import type {
   IdentifyPendencyResponseDTO,
 } from '../types/api';
 
-/**
- * Função utilitária para desserializar com segurança o payload JSON de eventos SSE.
- */
 function safeJsonParse<T>(rawData: unknown): T | null {
   if (rawData === null || rawData === undefined) return null;
   if (typeof rawData !== 'string') return rawData as T;
@@ -42,9 +28,7 @@ function safeJsonParse<T>(rawData: unknown): T | null {
   }
 }
 
-/**
- * Obtém a implementação de EventSource disponível no ambiente (browser ou teste).
- */
+/** Resolves the environment's {@code EventSource} constructor (browser window or global test polyfill). */
 function getEventSourceConstructor(): typeof EventSource | null {
   if (typeof window !== 'undefined' && window.EventSource) {
     return window.EventSource;
@@ -56,11 +40,13 @@ function getEventSourceConstructor(): typeof EventSource | null {
 }
 
 /**
- * Inscreve-se no canal SSE em tempo real de um curral.
- * Suporta reconexão automática com backoff exponencial e limpeza resiliente de recursos.
+ * Opens an SSE subscription for a corral and binds listeners for all named domain events.
  *
- * @param options Configurações e callbacks de eventos do stream.
- * @returns Função unsubscribe para cancelar a escuta e fechar a conexão.
+ * <p>Reconnects automatically using 1.5x exponential backoff (capped at 15s up to {@code maxReconnectAttempts}),
+ * re-evaluating token functions on every reconnect so refreshed JWTs are picked up.</p>
+ *
+ * @param options subscription target, event callbacks, and reconnection settings
+ * @returns cleanup function that cancels pending timers and closes the active {@code EventSource}
  */
 export function subscribeToCorralStream(options: SseSubscriptionOptions): () => void {
   const {
@@ -101,7 +87,6 @@ export function subscribeToCorralStream(options: SseSubscriptionOptions): () => 
   function connect() {
     if (!isSubscribed) return;
 
-    // Resgata o token de autenticação ativo (suporta getter dinâmico para renovação em reconexão)
     const token =
       typeof customToken === 'function'
         ? customToken()
@@ -127,7 +112,6 @@ export function subscribeToCorralStream(options: SseSubscriptionOptions): () => 
         if (!isSubscribed) return;
         onError?.(event);
 
-        // Se o EventSource estiver fechado ou com erro de conexão, agenda reconexão controlada
         if (autoReconnect && isSubscribed) {
           if (es.readyState === 2 /* CLOSED */ || es.readyState === 0 /* CONNECTING */) {
             es.close();
@@ -147,7 +131,6 @@ export function subscribeToCorralStream(options: SseSubscriptionOptions): () => 
         }
       };
 
-      // 1. Evento 'connected'
       es.addEventListener('connected', (event: MessageEvent) => {
         if (!isSubscribed) return;
         const data = safeJsonParse<SseConnectedData>(event.data);
@@ -156,7 +139,6 @@ export function subscribeToCorralStream(options: SseSubscriptionOptions): () => 
         }
       });
 
-      // 2. Evento 'odor'
       es.addEventListener('odor', (event: MessageEvent) => {
         if (!isSubscribed) return;
         const data = safeJsonParse<OdorTelemetryResponseDTO>(event.data);
@@ -165,7 +147,6 @@ export function subscribeToCorralStream(options: SseSubscriptionOptions): () => 
         }
       });
 
-      // 3. Evento 'presenca'
       es.addEventListener('presenca', (event: MessageEvent) => {
         if (!isSubscribed) return;
         const data = safeJsonParse<AnimalEventResponseDTO>(event.data);
@@ -174,7 +155,6 @@ export function subscribeToCorralStream(options: SseSubscriptionOptions): () => 
         }
       });
 
-      // 4. Evento 'pendencia'
       es.addEventListener('pendencia', (event: MessageEvent) => {
         if (!isSubscribed) return;
         const data = safeJsonParse<IdentifyPendencyResponseDTO>(event.data);
@@ -183,7 +163,6 @@ export function subscribeToCorralStream(options: SseSubscriptionOptions): () => 
         }
       });
 
-      // 5. Evento 'limpeza'
       es.addEventListener('limpeza', (event: MessageEvent) => {
         if (!isSubscribed) return;
         const data = safeJsonParse<CleanCmdResponseDTO>(event.data);
@@ -192,7 +171,6 @@ export function subscribeToCorralStream(options: SseSubscriptionOptions): () => 
         }
       });
 
-      // 6. Evento 'status'
       es.addEventListener('status', (event: MessageEvent) => {
         if (!isSubscribed) return;
         const data = safeJsonParse<CorralResponseDTO>(event.data);
@@ -201,7 +179,6 @@ export function subscribeToCorralStream(options: SseSubscriptionOptions): () => 
         }
       });
 
-      // 7. Eventos de mensagem genérica
       if (onMessage) {
         es.onmessage = (event: MessageEvent) => {
           if (!isSubscribed) return;
@@ -214,10 +191,8 @@ export function subscribeToCorralStream(options: SseSubscriptionOptions): () => 
     }
   }
 
-  // Inicia conexão inicial
   connect();
 
-  // Função de desmontagem e encerramento
   return () => {
     isSubscribed = false;
     clearTimeout(reconnectTimer);
