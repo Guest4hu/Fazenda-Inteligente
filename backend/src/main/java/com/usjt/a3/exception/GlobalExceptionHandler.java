@@ -14,10 +14,15 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * Translates domain, security, and validation exceptions into RFC 7807 {@link ProblemDetail} HTTP responses.
+ *
+ * <p>Maps {@link IllegalStateException} business-rule conflicts (such as occupied corrals or offline devices)
+ * to {@code 409 Conflict} and aggregates bean validation field errors under {@code invalidParams}.</p>
+ */
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
-    // 1. Falha de autenticação (Login/Senha)
     @ExceptionHandler(BadCredentialsException.class)
     public ProblemDetail handleBadCredentials(BadCredentialsException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.
@@ -26,7 +31,6 @@ public class GlobalExceptionHandler {
         return problem;
     }
 
-    // 2. Recurso não encontrado
     @ExceptionHandler(EntityNotFoundException.class)
     public ProblemDetail handleEntityNotFound(EntityNotFoundException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.
@@ -35,7 +39,6 @@ public class GlobalExceptionHandler {
         return problem;
     }
 
-    // 3. Permissão negada (Segurança de propriedade do curral)
     @ExceptionHandler(SecurityException.class)
     public ProblemDetail handleSecurity(SecurityException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.
@@ -44,7 +47,6 @@ public class GlobalExceptionHandler {
         return problem;
     }
 
-    // 4 - Regras de negocio
     @ExceptionHandler(IllegalStateException.class)
     public ProblemDetail handleIllegalState(IllegalStateException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.
@@ -84,7 +86,6 @@ public class GlobalExceptionHandler {
         return problem;
     }
 
-    // 7. Erros inesperados / Erro interno do servidor (500)
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleGeneralException(Exception ex) {
         log.error("Erro inesperado capturado pelo GlobalExceptionHandler: ", ex);
