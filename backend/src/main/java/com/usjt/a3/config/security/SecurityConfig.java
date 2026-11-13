@@ -13,6 +13,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+/**
+ * Stateless HTTP security configuration using JWT authentication via {@link SecurityFilter}.
+ */
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
@@ -20,6 +23,14 @@ public class SecurityConfig {
 
     private final SecurityFilter securityFilter;
 
+    /**
+     * Disables CSRF and HTTP sessions, permits authentication and actuator endpoints,
+     * and enforces authentication on all remaining API routes.
+     *
+     * @param http Spring Security builder
+     * @return configured {@link SecurityFilterChain}
+     * @throws Exception if security configuration fails
+     */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
