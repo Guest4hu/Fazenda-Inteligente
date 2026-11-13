@@ -8,7 +8,8 @@
     { "type": "board-mfrc522", "id": "rfid1", "top": -250, "left": 95, "attrs": {} },
     { "type": "wokwi-dht22", "id": "dht1", "top": -230, "left": 305, "attrs": {} },
     { "type": "wokwi-gas-sensor", "id": "gas1", "top": -230, "left": 470, "attrs": {} },
-    { "type": "wokwi-relay-module", "id": "relay1", "top": 230, "left": 540, "attrs": {} },
+    { "type": "wokwi-relay-module", "id": "relay1", "top": 230, "left": 540, "attrs": { "transistor": "pnp" } },
+    { "type": "wokwi-pir-motion-sensor", "id": "pir1", "top": -90, "left": 95, "attrs": { "delayTime": "3", "inhibitTime": "1" } },
     { "type": "wokwi-led", "id": "led1", "top": 230, "left": 680, "attrs": { "color": "red", "flip": "" } },
     { "type": "wokwi-resistor", "id": "r3", "top": 175, "left": 650, "attrs": { "value": "220" } }
   ],
@@ -38,6 +39,10 @@
     [ "dht1:VCC", "bb1:tp.18", "orange", [] ],
     [ "dht1:GND", "bb1:tn.19", "black", [] ],
     [ "dht1:SDA", "esp:32", "green", [] ],
+
+    [ "pir1:VCC", "bb1:tp.10", "orange", [] ],
+    [ "pir1:GND", "bb1:tn.10", "black", [] ],
+    [ "pir1:OUT", "esp:27", "green", [] ],
 
     [ "gas1:VCC", "bb1:bp.30", "red", [] ],
     [ "gas1:GND", "bb1:tn.30", "black", [] ],
