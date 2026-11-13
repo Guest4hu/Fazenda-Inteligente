@@ -33,6 +33,11 @@ export interface AnimalPresenceListProps {
   onStopWash?: (msg: string, kind: 'info' | 'ok' | 'warn' | 'danger') => void;
 }
 
+/**
+ * Herd occupancy and animal registry card displaying animals inside the active
+ * corral, manual {@code ENTROU}/{@code SAIU} presence controls with safety lock
+ * feedback, smart toggle fallback, and animal create/edit dialogs.
+ */
 export const AnimalPresenceList: React.FC<AnimalPresenceListProps> = ({
   corralId,
   farmId,
@@ -49,7 +54,7 @@ export const AnimalPresenceList: React.FC<AnimalPresenceListProps> = ({
   const [internalSimulated, setInternalSimulated] = useState(presenceSimulated);
   const [activeTab, setActiveTab] = useState<'corral' | 'all'>('corral');
 
-  // Animais filtrados no curral atual
+  // Animals currently inside this corral
   const animalsInCorral = isLive && corralId
     ? animals.filter((a) => a.currentCorralId === corralId)
     : [];
@@ -60,10 +65,10 @@ export const AnimalPresenceList: React.FC<AnimalPresenceListProps> = ({
 
   const effectiveSimulated = onTogglePresenceSimulated ? presenceSimulated : internalSimulated;
 
-  // Presença efetiva: animais reais no curral ou simulação ativada
+  // Effective presence: real animals inside the corral or simulated detection active
   const hasPresence = isLive ? (animalsInCorral.length > 0 || effectiveSimulated) : effectiveSimulated;
 
-  // Estados locais do diálogo de cadastro / edição de animal
+  // Animal create/edit dialog state
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingAnimal, setEditingAnimal] = useState<AnimalResponseDTO | null>(null);
   const [name, setName] = useState('');
@@ -75,12 +80,11 @@ export const AnimalPresenceList: React.FC<AnimalPresenceListProps> = ({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // Estados para exclusão de animal
+  // Animal delete confirmation state
   const [deletingAnimal, setDeletingAnimal] = useState<AnimalResponseDTO | null>(null);
   const [isDeletingAnimal, setIsDeletingAnimal] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  // Abrir diálogo para novo animal
   const handleOpenCreate = () => {
     setEditingAnimal(null);
     setName('');
@@ -92,7 +96,6 @@ export const AnimalPresenceList: React.FC<AnimalPresenceListProps> = ({
     setShowAddDialog(true);
   };
 
-  // Abrir diálogo para editar animal
   const handleOpenEdit = (animal: AnimalResponseDTO) => {
     setEditingAnimal(animal);
     setName(animal.name);
@@ -104,7 +107,11 @@ export const AnimalPresenceList: React.FC<AnimalPresenceListProps> = ({
     setShowAddDialog(true);
   };
 
-  // Alternar presença principal (preserva comportamento exato do switch-presence)
+  /**
+   * Toggles corral occupancy safely via the top-level switch: prefers moving an
+   * inside animal out first, otherwise moves an outside animal in (firing
+   * biological shutoff if washing), or toggles simulated PIR state offline.
+   */
   const handleToggleSwitch = async () => {
     if (!isLive || !corralId) {
       if (onTogglePresenceSimulated) {
@@ -127,10 +134,8 @@ export const AnimalPresenceList: React.FC<AnimalPresenceListProps> = ({
       return;
     }
 
-    // No modo online com curral selecionado:
-    // Se há animais no curral, remove o primeiro (SAIU)
-    // Se o curral está vazio mas há animais fora, insere o primeiro (ENTROU)
-    // Se não há animais cadastrados, aciona presença simulada
+    // Online mode with a selected corral: exit first occupied animal, enter first outside animal,
+    // or fall back to simulated presence when no animals are registered.
     if (animalsInCorral.length > 0) {
       const animalToExit = animalsInCorral[0];
       await handlePresenceAction(animalToExit.tagUid, 'SAIU', animalToExit.name);
@@ -157,7 +162,7 @@ export const AnimalPresenceList: React.FC<AnimalPresenceListProps> = ({
     }
   };
 
-  // Registrar movimentação manual de animal (POST /currais/{corralId}/presenca)
+  /** Dispatches a manual {@code ENTROU} or {@code SAIU} event via {@code POST /presenca}. */
   const handlePresenceAction = async (
     targetTagUid: string,
     typeEvent: AnimalEventType,
@@ -199,7 +204,7 @@ export const AnimalPresenceList: React.FC<AnimalPresenceListProps> = ({
     }
   };
 
-  // Salvar animal (Cadastro ou Edição)
+  /** Creates or updates an animal record with optional immediate tag linking. */
   const handleSaveAnimal = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!farmId) {
@@ -258,7 +263,6 @@ export const AnimalPresenceList: React.FC<AnimalPresenceListProps> = ({
     }
   };
 
-  // Confirmar exclusão de animal
   const handleConfirmDelete = async () => {
     if (!deletingAnimal) return;
     setIsDeletingAnimal(true);
@@ -285,7 +289,6 @@ export const AnimalPresenceList: React.FC<AnimalPresenceListProps> = ({
         hasPresence ? 'ring-2 ring-destructive' : ''
       }`}
     >
-      {/* Cabeçalho do Card */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <h2 id="h-animal" className="text-lg font-bold flex items-center gap-2">
           <PawPrint className="size-5" aria-hidden /> Presença (PIR)
@@ -309,7 +312,6 @@ export const AnimalPresenceList: React.FC<AnimalPresenceListProps> = ({
         </div>
       </div>
 
-      {/* Indicador de Status com data-testid="status-presence" */}
       <p
         className={`mt-3 text-2xl font-extrabold pop ${
           hasPresence ? 'text-destructive' : 'text-primary'
@@ -321,7 +323,7 @@ export const AnimalPresenceList: React.FC<AnimalPresenceListProps> = ({
         {hasPresence ? 'Animal detectado' : 'Curral livre'}
       </p>
 
-      {/* Indicador de Detecção Automática Contínua */}
+      {/* Continuous automatic RFID/MQTT detection indicator */}
       {isLive && (
         <div className="flex items-center gap-1.5 text-xs text-primary font-semibold mt-1">
           <span className="relative flex h-2 w-2">
@@ -334,7 +336,6 @@ export const AnimalPresenceList: React.FC<AnimalPresenceListProps> = ({
         </div>
       )}
 
-      {/* Contador Informativo */}
       {isLive && (
         <p className="text-xs text-muted-foreground mt-0.5">
           {animalsInCorral.length === 1
@@ -343,7 +344,6 @@ export const AnimalPresenceList: React.FC<AnimalPresenceListProps> = ({
         </p>
       )}
 
-      {/* Switch de Presença com data-testid="switch-presence" */}
       <button
         type="button"
         role="switch"
@@ -368,7 +368,7 @@ export const AnimalPresenceList: React.FC<AnimalPresenceListProps> = ({
         </span>
       </button>
 
-      {/* Lista de Animais com Filtro Interno (No Curral / Todos da Fazenda) */}
+      {/* Filterable farm/corral animal list */}
       {isLive && animals.length > 0 && (
         <div className="mt-4 border-t border-border pt-3">
           <div className="flex items-center justify-between gap-2 mb-2">
@@ -440,7 +440,6 @@ export const AnimalPresenceList: React.FC<AnimalPresenceListProps> = ({
                     </div>
 
                     <div className="flex items-center gap-1 shrink-0">
-                      {/* Botão de Presença: Saiu ou Entrou */}
                       {corralId && (
                         isInThisCorral ? (
                           <button
@@ -463,7 +462,6 @@ export const AnimalPresenceList: React.FC<AnimalPresenceListProps> = ({
                         )
                       )}
 
-                      {/* Botão Editar Animal */}
                       <button
                         onClick={() => handleOpenEdit(animal)}
                         className="p-1 rounded-lg border border-input bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition"
@@ -472,7 +470,6 @@ export const AnimalPresenceList: React.FC<AnimalPresenceListProps> = ({
                         <Pencil className="size-3.5" />
                       </button>
 
-                      {/* Botão Excluir Animal */}
                       <button
                         onClick={() => {
                           setDeleteError(null);
@@ -492,13 +489,13 @@ export const AnimalPresenceList: React.FC<AnimalPresenceListProps> = ({
         </div>
       )}
 
-      {/* Trava Biológica Informativa */}
+      {/* Biological safety lock notice */}
       <p className="mt-3 text-xs text-muted-foreground flex gap-1.5">
         <ShieldAlert className="size-4 shrink-0 text-destructive" aria-hidden />
         Com animal presente, toda lavagem é recusada e a bomba para na hora.
       </p>
 
-      {/* Modal / Diálogo: Cadastrar ou Editar Animal */}
+      {/* Create/edit animal modal */}
       {showAddDialog && (
         <div
           role="dialog"
@@ -632,7 +629,6 @@ export const AnimalPresenceList: React.FC<AnimalPresenceListProps> = ({
         </div>
       )}
 
-      {/* Diálogo de Confirmação para Excluir Animal */}
       {deletingAnimal && (
         <ConfirmDeleteDialog
           isOpen={Boolean(deletingAnimal)}
