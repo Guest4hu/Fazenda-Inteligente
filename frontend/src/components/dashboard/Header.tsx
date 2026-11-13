@@ -40,6 +40,10 @@ export interface HeaderProps {
   isSseConnected?: boolean;
 }
 
+/**
+ * Multi-tenant top navigation bar managing farm and corral selection, live API
+ * status badge, auth dialog trigger, and farm/corral CRUD modal lifecycles.
+ */
 export const Header: React.FC<HeaderProps> = ({
   user: propUser,
   isAuthenticated: propIsAuthenticated,
@@ -88,16 +92,16 @@ export const Header: React.FC<HeaderProps> = ({
   const selectedFarm = farms.find((f) => f.id === selectedFarmId) || null;
   const selectedCorral = currais.find((c) => c.id === selectedCorralId) || null;
 
-  // Modais de Criação
+  // Creation modal visibility state
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isFarmModalOpen, setIsFarmModalOpen] = useState(false);
   const [isCorralModalOpen, setIsCorralModalOpen] = useState(false);
 
-  // Modais de Edição
+  // Edit modal visibility state
   const [isEditFarmOpen, setIsEditFarmOpen] = useState(false);
   const [isEditCorralOpen, setIsEditCorralOpen] = useState(false);
 
-  // Modais de Exclusão
+  // Delete confirmation modal visibility and status state
   const [isDeleteFarmOpen, setIsDeleteFarmOpen] = useState(false);
   const [isDeletingFarm, setIsDeletingFarm] = useState(false);
   const [deleteFarmError, setDeleteFarmError] = useState<string | null>(null);
@@ -157,7 +161,7 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <>
       <header className="max-w-5xl mx-auto px-4 pt-8 pb-6">
-        {/* Linha Superior: Tagline, Status do Backend e Ações de Usuário */}
+        {/* Top bar: mode tagline, backend status badge, and user auth actions */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 flex-wrap">
             <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
@@ -231,7 +235,6 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Título Principal */}
         <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-primary mt-2">
           Limpeza Inteligente do Curral
         </h1>
@@ -239,10 +242,10 @@ export const Header: React.FC<HeaderProps> = ({
           Sistema de telemetria e lavagem automatizada com fail-fast biológico contra acionamento indevido na presença de animais.
         </p>
 
-        {/* Barra Seletora Multi-Fazenda e Multi-Curral */}
+        {/* Multi-farm and multi-corral selector bar */}
         <div className="mt-6 rounded-2xl border border-card-border bg-card p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-4 flex-1">
-            {/* Seletor de Fazenda */}
+            {/* Farm selector */}
             <div className="flex items-center gap-2 min-w-[220px]">
               <Tractor className="size-4 text-primary shrink-0" />
               <div className="flex-1">
@@ -310,7 +313,7 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </div>
 
-            {/* Seletor de Curral */}
+            {/* Corral selector */}
             <div className="flex items-center gap-2 min-w-[220px]">
               <Fence className="size-4 text-primary shrink-0" />
               <div className="flex-1">
@@ -379,7 +382,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Badge de Conectividade do Curral Selecionado */}
+          {/* Selected corral connectivity and SSE status badges */}
           {selectedCorral && (
             <div className="flex items-center gap-2">
               <span
@@ -411,7 +414,7 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </div>
 
-        {/* Guias de Onboarding Contextuais */}
+        {/* Contextual onboarding prompts for empty farm/corral states */}
         {isAuthenticated && farms.length === 0 && !isLoadingFarms && (
           <div className="mt-3 rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs text-foreground flex items-center justify-between gap-3 animate-in fade-in">
             <div className="flex items-center gap-2">
@@ -449,7 +452,7 @@ export const Header: React.FC<HeaderProps> = ({
         )}
       </header>
 
-      {/* Diálogos Modais Internos se disparados internamente */}
+      {/* Internal modal dialogs when managed within Header */}
       <AuthDialog
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
@@ -458,7 +461,6 @@ export const Header: React.FC<HeaderProps> = ({
         isBackendOnline={isBackendOnline}
       />
 
-      {/* Criação de Fazenda */}
       <FarmModal
         isOpen={isFarmModalOpen}
         mode="create"
@@ -466,7 +468,6 @@ export const Header: React.FC<HeaderProps> = ({
         onSuccess={onRefreshAll}
       />
 
-      {/* Edição de Fazenda */}
       {selectedFarm && (
         <FarmModal
           isOpen={isEditFarmOpen}
@@ -477,7 +478,6 @@ export const Header: React.FC<HeaderProps> = ({
         />
       )}
 
-      {/* Exclusão de Fazenda */}
       {selectedFarm && (
         <ConfirmDeleteDialog
           isOpen={isDeleteFarmOpen}
@@ -495,7 +495,6 @@ export const Header: React.FC<HeaderProps> = ({
         />
       )}
 
-      {/* Criação de Curral */}
       {selectedFarmId && (
         <CorralModal
           isOpen={isCorralModalOpen}
@@ -506,7 +505,6 @@ export const Header: React.FC<HeaderProps> = ({
         />
       )}
 
-      {/* Edição de Curral */}
       {selectedFarmId && selectedCorral && (
         <CorralModal
           isOpen={isEditCorralOpen}
@@ -518,7 +516,6 @@ export const Header: React.FC<HeaderProps> = ({
         />
       )}
 
-      {/* Exclusão de Curral */}
       {selectedCorral && (
         <ConfirmDeleteDialog
           isOpen={isDeleteCorralOpen}
