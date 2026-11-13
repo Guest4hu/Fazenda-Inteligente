@@ -11,6 +11,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Spring Data repository for {@link CleanCmd} wash command records and active-state lock checks.
+ */
 @Repository
 public interface CleanCmdRepository extends JpaRepository<CleanCmd, UUID> {
 
@@ -18,6 +21,12 @@ public interface CleanCmdRepository extends JpaRepository<CleanCmd, UUID> {
 
     boolean existsByCorralFarmIdAndCleanState(Long farmId, CleanState cleanState);
 
+    /**
+     * Retrieves wash command history newest-first while eagerly fetching {@code corral} to avoid N+1 loads.
+     *
+     * @param corralId corral identifier
+     * @return wash command records ordered from newest to oldest
+     */
     @EntityGraph(attributePaths = {"corral"})
     List<CleanCmd> findByCorralIdOrderByCreatedAtDesc(Long corralId);
 
