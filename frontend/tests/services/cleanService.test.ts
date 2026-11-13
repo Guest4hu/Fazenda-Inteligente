@@ -102,6 +102,45 @@ describe('cleanService', () => {
     });
   });
 
+  describe('Endpoint: POST /api/v1/currais/{corralId}/limpeza/parar', () => {
+    it('deve enviar comando de parada da bomba com sucesso', async () => {
+      const stopResp = {
+        id: 'stop-uuid-1',
+        corralId: 1,
+        origin: 'MANUAL' as const,
+        state: 'CANCELADO' as const,
+        secondsDuration: 0,
+        createdAt: '2026-10-23T18:16:00',
+        mensagem: 'Bomba parada e confirmada com sucesso!',
+      };
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        mockFetchSuccess(stopResp, 200)
+      );
+
+      const result = await cleanService.stopCleaning(1);
+      expect(result).toEqual(stopResp);
+
+      const { url, options } = getFetchCallDetails(fetchSpy);
+      expect(url).toMatch(/\/currais\/1\/limpeza\/parar$/);
+      expect(options.method).toBe('POST');
+    });
+
+    it('deve capturar erro 409 caso o ESP32 esteja offline', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        mockFetchProblemDetail(
+          {
+            status: 409,
+            title: 'Conflito de Regra de Negócio',
+            detail: 'O dispositivo deste curral está offline ou sem comunicação recente, verifique a conexão antes de acionar a bomba',
+          },
+          409
+        )
+      );
+
+      await expect(cleanService.stopCleaning(1)).rejects.toThrow();
+    });
+  });
+
   describe('Endpoint 24: GET /api/v1/currais/{corralId}/limpezas', () => {
     it('deve consultar histórico de limpezas do curral', async () => {
       const history = [
