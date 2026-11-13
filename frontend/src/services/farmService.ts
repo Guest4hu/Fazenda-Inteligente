@@ -1,14 +1,14 @@
 /**
- * src/services/farmService.ts
- * Gestão de Fazendas do Produtor Rural Autenticado.
+ * Service for authenticated producer farm CRUD operations.
  */
 
 import { apiClient } from './apiClient';
 import type { FarmRequestDTO, FarmResponseDTO } from '../types/api';
 
 /**
- * Lista todas as fazendas do produtor rural autenticado.
- * Endpoint: GET /api/v1/farms
+ * Lists all farms belonging to the authenticated user.
+ *
+ * @endpoint GET /api/v1/farms
  */
 export async function listFarms(): Promise<FarmResponseDTO[]> {
   return apiClient<FarmResponseDTO[]>('/farms', {
@@ -17,8 +17,9 @@ export async function listFarms(): Promise<FarmResponseDTO[]> {
 }
 
 /**
- * Cadastra uma nova fazenda.
- * Endpoint: POST /api/v1/farms
+ * Creates a new farm owned by the authenticated user.
+ *
+ * @endpoint POST /api/v1/farms
  */
 export async function createFarm(data: FarmRequestDTO): Promise<FarmResponseDTO> {
   return apiClient<FarmResponseDTO>('/farms', {
@@ -28,8 +29,9 @@ export async function createFarm(data: FarmRequestDTO): Promise<FarmResponseDTO>
 }
 
 /**
- * Atualiza o nome de uma fazenda existente.
- * Endpoint: PUT /api/v1/farms/{farmId}
+ * Renames an existing farm.
+ *
+ * @endpoint PUT /api/v1/farms/{farmId}
  */
 export async function updateFarm(farmId: number, data: FarmRequestDTO): Promise<FarmResponseDTO> {
   const safeId = encodeURIComponent(String(farmId));
@@ -40,8 +42,9 @@ export async function updateFarm(farmId: number, data: FarmRequestDTO): Promise<
 }
 
 /**
- * Exclui uma fazenda (caso não haja limpezas ativas).
- * Endpoint: DELETE /api/v1/farms/{farmId}
+ * Deletes a farm when none of its corrals have active wash commands.
+ *
+ * @endpoint DELETE /api/v1/farms/{farmId}
  */
 export async function deleteFarm(farmId: number): Promise<void> {
   const safeId = encodeURIComponent(String(farmId));
