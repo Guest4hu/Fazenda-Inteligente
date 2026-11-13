@@ -12,6 +12,11 @@ export interface ConnectivityBannerProps {
   isSseConnected?: boolean;
 }
 
+/**
+ * Displays the ESP32 device connectivity status banner for the selected corral,
+ * distinguishing between local simulation fallback, offline heartbeat staleness,
+ * and live MQTT/SSE telemetry.
+ */
 export const ConnectivityBanner: React.FC<ConnectivityBannerProps> = ({
   deviceStatus,
   lastSeenAt,
@@ -21,10 +26,10 @@ export const ConnectivityBanner: React.FC<ConnectivityBannerProps> = ({
   isLive,
   isSseConnected,
 }) => {
-  // Se explicitamente não estiver ao vivo ou estiver em modo simulado
+  // Treat missing telemetry or disabled live mode as local simulation
   const effectiveSimulated = isSimulated || (isLive !== undefined && !isLive) || !deviceStatus;
 
-  // 1. Preservação exata do modo simulado para compatibilidade retroativa
+  // 1. Preserve simulated mode banner for offline/fallback compatibility
   if (effectiveSimulated) {
     return (
       <div
