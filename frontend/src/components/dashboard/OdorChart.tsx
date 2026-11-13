@@ -11,6 +11,11 @@ export interface OdorChartProps {
   simulatedMqValue?: number;
 }
 
+/**
+ * Custom responsive SVG area and line chart for MQ-135 raw ADC odor telemetry.
+ * Sorts readings chronologically against the {@code limitOdor} threshold line
+ * and synthesizes a baseline preview curve when offline with no stored readings.
+ */
 export const OdorChart: React.FC<OdorChartProps> = ({
   readings = [],
   limitOdor = 400,
@@ -21,7 +26,7 @@ export const OdorChart: React.FC<OdorChartProps> = ({
 }) => {
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
-  // Se não estiver online e sem leituras reais, cria um mock visual baseado no valor simulado
+  // Synthesize a visual baseline trend when offline and no telemetry history exists
   const effectiveReadings: OdorTelemetryResponseDTO[] = readings.length > 0
     ? readings
     : isLive
@@ -34,7 +39,7 @@ export const OdorChart: React.FC<OdorChartProps> = ({
         { id: 5, corralId: 0, value: simulatedMqValue, instant: new Date().toISOString() },
       ];
 
-  // Ordena leituras em ordem cronológica (esquerda para a direita)
+  // Sort readings chronologically from left to right
   const sorted = [...effectiveReadings].sort((a, b) => new Date(a.instant).getTime() - new Date(b.instant).getTime());
 
   if (isLoading) {
@@ -87,7 +92,7 @@ export const OdorChart: React.FC<OdorChartProps> = ({
     return height - padBottom - ((val - minVal) / range) * (height - padTop - padBottom);
   };
 
-  // Coordenadas dos pontos
+  // Compute SVG point coordinates
   const points = sorted.map((r, i) => ({
     x: getX(i),
     y: getY(r.value),
@@ -115,7 +120,6 @@ export const OdorChart: React.FC<OdorChartProps> = ({
 
   return (
     <section className={`rounded-2xl border border-card-border bg-card p-5 shadow-sm md:col-span-3 space-y-3 ${className}`}>
-      {/* Cabeçalho do Card */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-lg font-bold flex items-center gap-2">
           <Wind className="size-5" aria-hidden /> Telemetria de Amônia (MQ-135)
@@ -128,7 +132,7 @@ export const OdorChart: React.FC<OdorChartProps> = ({
         </span>
       </div>
 
-      {/* Resumo e Limiar */}
+      {/* Latest value summary and trigger threshold */}
       <div className="flex items-center justify-between flex-wrap gap-2 text-xs">
         <div className="flex items-center gap-2">
           <span className="text-muted-foreground">Última:</span>
@@ -142,7 +146,7 @@ export const OdorChart: React.FC<OdorChartProps> = ({
         </div>
       </div>
 
-      {/* Canvas SVG Responsivo */}
+      {/* Responsive SVG chart canvas */}
       <div className="relative w-full overflow-hidden rounded-xl bg-background border border-border p-2">
         <svg
           data-testid="chart-odor-svg"
@@ -157,7 +161,7 @@ export const OdorChart: React.FC<OdorChartProps> = ({
             </linearGradient>
           </defs>
 
-          {/* Linhas de Grade Horizontal */}
+          {/* Horizontal grid lines */}
           {[minVal, Math.round((minVal + maxVal) / 2), maxVal].map((gridVal) => {
             const y = getY(gridVal);
             return (
@@ -170,7 +174,7 @@ export const OdorChart: React.FC<OdorChartProps> = ({
             );
           })}
 
-          {/* Linha Tracejada de Limiar */}
+          {/* Dashed trigger threshold line */}
           <line
             x1={padLeft}
             y1={thresholdY}
@@ -181,11 +185,11 @@ export const OdorChart: React.FC<OdorChartProps> = ({
             strokeDasharray="4 4"
           />
 
-          {/* Área e Linha das Leituras */}
+          {/* Telemetry area fill and trend polyline */}
           <path d={areaPath} fill="url(#odorGradient)" />
           <path d={linePath} fill="none" stroke="var(--color-primary, #2d7a46)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
 
-          {/* Nós / Pontos de Leitura */}
+          {/* Interactive data nodes */}
           {points.map((p, i) => {
             const isCritical = p.reading.value >= limitOdor;
             const isHovered = hoveredIdx === i;
@@ -205,7 +209,7 @@ export const OdorChart: React.FC<OdorChartProps> = ({
           })}
         </svg>
 
-        {/* Tooltip ao passar o cursor */}
+        {/* Hover tooltip */}
         {hoveredIdx !== null && points[hoveredIdx] && (
           <div
             className="absolute z-10 -translate-x-1/2 bottom-12 pointer-events-none rounded-lg bg-foreground text-background px-2.5 py-1 text-xs shadow-lg font-mono"
