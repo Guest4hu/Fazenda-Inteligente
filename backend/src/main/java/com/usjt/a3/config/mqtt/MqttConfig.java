@@ -20,6 +20,12 @@ import java.util.Arrays;
 import java.util.UUID;
 
 
+/**
+ * Spring Integration MQTT client configuration for inbound telemetry and outbound commands.
+ *
+ * <p>Uses separate TX and RX client identifiers derived from a per-instance random UUID suffix
+ * to avoid broker session collisions across restarts or concurrent instances.</p>
+ */
 @Configuration
 @EnableConfigurationProperties(MqttProperties.class)
 @RequiredArgsConstructor
@@ -32,8 +38,12 @@ public class MqttConfig {
         return properties.clientIdPrefix() + "-" + papel + "-" + sufix;
     }
 
-    // Conexão
-
+    /**
+     * Configures the Paho MQTT client factory with clean sessions, automatic reconnect,
+     * a 10s connection timeout, and a 60s keep-alive interval.
+     *
+     * @return shared {@link MqttPahoClientFactory} for inbound and outbound adapters
+     */
     @Bean
     public MqttPahoClientFactory mqttPahoClientFactory(){
         MqttConnectOptions options = new MqttConnectOptions();
@@ -48,12 +58,21 @@ public class MqttConfig {
         return factory;
     }
 
-    // Saida
+    /**
+     * Creates the synchronous direct channel used by {@link MqttGateway} for outbound messages.
+     *
+     * @return outbound {@link MessageChannel}
+     */
     @Bean
     public MessageChannel mqttOutboundChannel(){
         return new DirectChannel();
     }
 
+    /**
+     * Registers the outbound MQTT publisher defaulting to QoS 1 (at-least-once) and non-retained delivery.
+     *
+     * @return configured outbound {@link MessageHandler}
+     */
     @Bean
     @ServiceActivator(inputChannel = "mqttOutboundChannel")
     public MessageHandler mqttOutbound() {
@@ -64,13 +83,22 @@ public class MqttConfig {
         return handler;
     }
 
-    // Entrada
-
+    /**
+     * Creates the direct channel receiving inbound device MQTT messages.
+     *
+     * @return inbound {@link MessageChannel}
+     */
     @Bean
     public MessageChannel mqttInputChannel(){
         return new DirectChannel();
     }
 
+    /**
+     * Subscribes to all {@link EntryTopics} wildcard filters under {@link MqttProperties#topicPrefix()}
+     * at QoS 1 and forwards payloads to {@link #mqttInputChannel()}.
+     *
+     * @return configured inbound {@link MessageProducer}
+     */
     @Bean
     public MessageProducer mqttInbound() {
         String[] topicos = Arrays.stream(EntryTopics.values())
