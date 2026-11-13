@@ -15,6 +15,10 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+/**
+ * Manages Server-Sent Events (SSE) subscriptions per corral for pushing real-time updates
+ * ({@code odor}, {@code presenca}, {@code limpeza}, {@code status}, {@code pendencia}) to connected clients.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -23,6 +27,15 @@ public class CorralSseService {
     private final CorralRepository corralRepository;
     private final Map<Long, List<SseEmitter>> emittersByCorral = new ConcurrentHashMap<>();
 
+    /**
+     * Verifies user ownership and optional farm containment, registers a no-timeout {@link SseEmitter},
+     * attaches lifecycle cleanup callbacks, and dispatches an initial {@code connected} event.
+     *
+     * @param corralId target corral identifier
+     * @param farmId optional parent farm identifier for nested route validation
+     * @param userId authenticated owner identifier
+     * @return active {@link SseEmitter} bound to the corral channel
+     */
     @Transactional(readOnly = true)
     public SseEmitter subscribe(Long corralId, Long farmId, Long userId) {
         Corral corral = corralRepository.findById(corralId)
@@ -56,10 +69,24 @@ public class CorralSseService {
         return emitter;
     }
 
+    /**
+     * Subscribes to SSE updates for a corral without constraining by parent farm ID.
+     *
+     * @param corralId target corral identifier
+     * @param userId authenticated owner identifier
+     * @return active {@link SseEmitter}
+     */
     public SseEmitter subscribe(Long corralId, Long userId) {
         return subscribe(corralId, null, userId);
     }
 
+    /**
+     * Broadcasts a named SSE event to all active subscribers of a corral, pruning disconnected emitters on failure.
+     *
+     * @param corralId target corral identifier
+     * @param eventName SSE event name (e.g., {@code odor}, {@code presenca}, {@code limpeza}, {@code status}, {@code pendencia})
+     * @param data JSON-serializable payload
+     */
     public void sendEvent(Long corralId, String eventName, Object data) {
         List<SseEmitter> emitters = emittersByCorral.get(corralId);
         if (emitters == null || emitters.isEmpty()) {
