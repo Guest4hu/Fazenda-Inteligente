@@ -1,11 +1,9 @@
 /**
- * src/types/api.ts
- * Contratos de dados canônicos (DTOs) e enums da API REST do Curral Inteligente.
- * Baseado na Seção 11 de api-frontend.md e modelos do backend Spring Boot.
+ * Canonical REST and SSE TypeScript contracts aligned with the Spring Boot backend DTOs and enums.
  */
 
 // ============================================================================
-// 1. ENUMS E TIPOS LITERAIS
+// 1. ENUMS & LITERAL TYPES
 // ============================================================================
 
 export type DeviceStatus = 'ONLINE' | 'OFFLINE';
@@ -42,7 +40,7 @@ export const CleanState = {
 };
 
 // ============================================================================
-// 2. RFC 7807 PROBLEM DETAIL (TRATAMENTO DE ERROS PADRÃO)
+// 2. RFC 7807 PROBLEM DETAIL
 // ============================================================================
 
 export interface InvalidParam {
@@ -50,6 +48,7 @@ export interface InvalidParam {
   reason: string;
 }
 
+/** RFC 7807 error payload returned by Spring's {@code GlobalExceptionHandler}. */
 export interface ProblemDetail {
   type: string;
   title: string;
@@ -61,7 +60,7 @@ export interface ProblemDetail {
 }
 
 // ============================================================================
-// 3. MÓDULO 1 — AUTENTICAÇÃO (AUTH)
+// 3. AUTHENTICATION
 // ============================================================================
 
 export interface RegisterRequestDTO {
@@ -91,7 +90,7 @@ export interface AuthUser {
 }
 
 // ============================================================================
-// 4. MÓDULO 2 — FAZENDAS (FARMS)
+// 4. FARMS
 // ============================================================================
 
 export interface FarmRequestDTO {
@@ -105,19 +104,21 @@ export interface FarmResponseDTO {
 }
 
 // ============================================================================
-// 5. MÓDULO 3 — CURRAIS, PARÂMETROS E MÉTRICAS
+// 5. CORRALS, PARAMETERS & METRICS
 // ============================================================================
 
+/** Payload for creating or updating a corral; MAC must be 12 hex characters and pump duration 1–60s. */
 export interface CorralRequestDTO {
   name: string;
-  macAddress: string; // 12 hex chars (ex: "240AC4000110")
-  cleanTime?: string | null; // "HH:mm:ss" ou "HH:mm"
-  limitOdor?: number | null; // default 400
-  pumpDurationSeconds?: number | null; // 1..60, default 30
+  macAddress: string;
+  cleanTime?: string | null; // "HH:mm:ss" or "HH:mm"
+  limitOdor?: number | null; // defaults to 400
+  pumpDurationSeconds?: number | null; // 1..60, defaults to 30
 }
 
+/** Operational automation parameters; pass {@code cleanTime: null} to disable daily scheduled cleaning. */
 export interface CorralParametersRequestDTO {
-  cleanTime?: string | null; // Envie null para desligar o agendamento
+  cleanTime?: string | null;
   limitOdor?: number | null;
   pumpDurationSeconds?: number | null;
 }
@@ -153,7 +154,7 @@ export interface CorralMetricsResponseDTO {
 export type CorralMetricsDTO = CorralMetricsResponseDTO;
 
 // ============================================================================
-// 6. MÓDULO 4 — ANIMAIS E PRESENÇA RFID
+// 6. ANIMALS & RFID PRESENCE
 // ============================================================================
 
 export interface AnimalRequestDTO {
@@ -192,7 +193,7 @@ export interface AnimalEventResponseDTO {
 }
 
 // ============================================================================
-// 7. MÓDULO 5 — PENDÊNCIAS DE IDENTIFICAÇÃO RFID
+// 7. RFID IDENTIFICATION PENDENCIES
 // ============================================================================
 
 export interface ResolvePendencyRequestDTO {
@@ -214,7 +215,7 @@ export interface IdentifyPendencyResponseDTO {
 export type PendenciaResponseDTO = IdentifyPendencyResponseDTO;
 
 // ============================================================================
-// 8. MÓDULO 6 — LIMPEZA DO CURRAL
+// 8. CORRAL CLEANING COMMANDS
 // ============================================================================
 
 export interface CleanCmdRequestDTO {
@@ -233,7 +234,7 @@ export interface CleanCmdResponseDTO {
 }
 
 // ============================================================================
-// 9. MÓDULO 7 — TELEMETRIA DE ODOR (MQ-135)
+// 9. ODOR TELEMETRY (MQ-135)
 // ============================================================================
 
 export interface OdorTelemetryResponseDTO {
@@ -241,11 +242,13 @@ export interface OdorTelemetryResponseDTO {
   corralId: number;
   value: number;
   instant: string;
+  temperature?: number | null;
+  humidity?: number | null;
 }
 export type OdorReadingResponseDTO = OdorTelemetryResponseDTO;
 
 // ============================================================================
-// 10. MÓDULO 8 — STREAMING EM TEMPO REAL (SERVER-SENT EVENTS - SSE)
+// 10. REAL-TIME STREAMING (SERVER-SENT EVENTS)
 // ============================================================================
 
 export type SseEventType = 'connected' | 'limpeza' | 'odor' | 'status' | 'presenca' | 'pendencia';
@@ -266,6 +269,7 @@ export interface SseEventPayloadMap {
 
 export type SseEventHandler<T = unknown> = (data: T) => void;
 
+/** Configuration and event handlers for subscribing to {@link subscribeToCorralStream}. */
 export interface SseSubscriptionOptions {
   corralId: number;
   farmId?: number | null;
