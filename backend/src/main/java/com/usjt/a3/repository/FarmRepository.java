@@ -9,12 +9,17 @@ import java.util.List;
 @Repository
 public interface FarmRepository extends JpaRepository<Farm, Long> {
 
-    // 1. Listar todas as fazendas pertencentes a um determinado usuário
     List<Farm> findByUserId(Long userId);
 
-    // 2. Checar se já existe fazenda com o mesmo nome para aquele usuário
     boolean existsByNameAndUserId(String name, Long userId);
 
-    // 3. Checar se já existe outra fazenda com o mesmo nome para aquele usuário (excluindo a própria pelo ID)
+    /**
+     * Checks per-user farm name uniqueness excluding the farm currently being renamed.
+     *
+     * @param name   candidate farm name
+     * @param userId owning user identifier
+     * @param id     identifier of the farm being updated and excluded from matching
+     * @return {@code true} if another farm owned by the same user already uses {@code name}
+     */
     boolean existsByNameAndUserIdAndIdNot(String name, Long userId, Long id);
 }
