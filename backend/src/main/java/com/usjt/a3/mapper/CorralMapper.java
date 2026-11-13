@@ -10,6 +10,9 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 
+/**
+ * Maps {@link Corral} entities to DTOs while computing effective online status and applying default operational parameters.
+ */
 @Component
 public class CorralMapper {
 
@@ -35,6 +38,14 @@ public class CorralMapper {
         );
     }
 
+    /**
+     * Instantiates a new {@link Corral} defaulting to {@link DeviceStatus#OFFLINE},
+     * an odor threshold of {@code 400}, and a {@code 30}-second pump cycle when omitted.
+     *
+     * @param requestDTO validated corral creation payload
+     * @param farm       owning farm entity
+     * @return new unpersisted {@link Corral} entity, or {@code null} if {@code requestDTO} is {@code null}
+     */
     public Corral toEntity(CorralRequestDTO requestDTO, Farm farm) {
         if (requestDTO == null ) {
             return null;
@@ -54,6 +65,13 @@ public class CorralMapper {
                 .build();
     }
 
+    /**
+     * Computes effective controller connectivity, degrading {@link DeviceStatus#ONLINE} to
+     * {@link DeviceStatus#OFFLINE} if {@code lastSeenAt} is null or older than {@value #HEARTBEAT_TIMEOUT_SECONDS}s.
+     *
+     * @param corral corral entity to inspect
+     * @return effective {@link DeviceStatus} accounting for heartbeat expiration
+     */
     public DeviceStatus resolveEffectiveStatus(Corral corral) {
         if (corral == null || corral.getDeviceStatus() == null || corral.getDeviceStatus() == DeviceStatus.OFFLINE) {
             return DeviceStatus.OFFLINE;
